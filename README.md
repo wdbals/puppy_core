@@ -1,11 +1,11 @@
-# Puppies Engine
+# Puppies Core
 
 Base reutilizable para juegos en Godot 4. Centraliza servicios comunes en autoloads:
 audio, ciclo de vida del juego, input, video y guardado modular.
 
 ## Objetivo
 
-`puppies_engine` no pretende ser un framework cerrado. Es una capa pequena y
+`puppies_core` no pretende ser un framework cerrado. Es una capa pequena y
 copiable que deja resueltas las necesidades repetidas de un juego:
 
 - Estados globales del juego y cambios de escena.
@@ -45,7 +45,10 @@ puppies_engine/
 
 ## Instalacion En Otro Juego
 
-1. Copia la carpeta `puppies_engine/` al proyecto Godot.
+1. Copia la carpeta `puppies_core/` al proyecto Godot. O bien, añade el repositorio como submodulo.
+```bash
+git submodule add https://github.com/puppies-team/puppy_core.git
+```
 2. Registra estos autoloads en `Project Settings > Autoload`, en este orden:
 
 | Nombre | Script |
