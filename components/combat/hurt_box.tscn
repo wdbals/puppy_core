@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://bif2a3il8jebd"]
+
+[ext_resource type="Script" uid="uid://c6oql1k8qio7m" path="res://puppy_core/components/combat/hurt_box.gd" id="1_ivv4n"]
+
+[node name="HurtBox" type="Area2D" unique_id=370226618]
+collision_layer = 2
+collision_mask = 2
+monitoring = false
+script = ExtResource("1_ivv4n")
