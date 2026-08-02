@@ -18,15 +18,17 @@ enum HitboxMode {
 		if _timer: _timer.wait_time = time
 @export var can_fail := true
 
-var _can_attack = true
 var _timer: Timer
+# NUEVO: Lista para recordar a quién ya le hicimos daño
+var _hit_targets: Array[Area2D] = [] 
 
 func _ready() -> void:
 	_timer = Timer.new()
 	self.add_child(_timer)
 	_timer.wait_time = attack_cooldown
 	_timer.one_shot = true
-	_timer.timeout.connect(func(): _can_attack = true)
+	# Cuando termine el cooldown, olvidamos a quién golpeamos
+	_timer.timeout.connect(_on_cooldown_finished) 
 	
 	monitoring = true
 	monitorable = false
@@ -38,38 +40,40 @@ func get_damage() -> int:
 
 ## Recomendado para usar en modo MANUAL
 func attack() -> void:
-	if not _can_attack: return
-	
 	var hit_anyone = false
 	
 	for area in self.get_overlapping_areas():
-		if area is HurtBox:
+		# Solo hacemos daño si es HurtBox y NO está en la lista
+		if area is HurtBox and area not in _hit_targets:
 			area.attack(_damage_amount)
+			_hit_targets.append(area) # Lo registramos
 			hit_anyone = true
 			
-	
 	if hit_anyone:
 		hit_delivered.emit()
-		_can_attack = false
-		_timer.start()
+		if _timer.is_stopped():
+			_timer.start()
 
 func _on_area_entered(area: Area2D) -> void:
 	if mode == HitboxMode.MANUAL: 
 		return
 		
-	if not _can_attack: 
-		return
-	
-	if area is HurtBox:
+	# Misma lógica para el modo CONTACTO
+	if area is HurtBox and area not in _hit_targets:
 		area.attack(_damage_amount)
+		_hit_targets.append(area)
 		hit_delivered.emit()
-		_can_attack = false
-		_timer.start()
+		
+		if _timer.is_stopped():
+			_timer.start()
 
 func reset_cooldown() -> void:
-	_can_attack = true
+	_hit_targets.clear() # Vaciamos la lista manualmente
 	if _timer:
 		_timer.stop()
+
+func _on_cooldown_finished() -> void:
+	_hit_targets.clear()
 
 func activate() -> void:
 	monitoring = true
