@@ -35,7 +35,9 @@ var _current_game_state: GameEnums.GameState = GameEnums.GameState.BOOTING:
 			game_state_changed.emit(value)
 			print("Estado del juego: ", GameEnums.GameState.keys()[value])
 
-func _ready() -> void:    
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	
 	close_game_requested.connect(_quit_game)
 	
 	# Estado inicial
@@ -203,3 +205,52 @@ func _quit_game() -> void:
 
 func get_playtime() -> float: return _playtime
 func is_in_gameplay() -> bool: return _current_game_state == GameEnums.GameState.PLAYING
+
+## Ejecuta una acción (Callable) en el momento en que la pantalla está completamente cubierta.
+func execute_with_transition(
+	action: Callable, 
+	transition_color: Color = Color("080d1c"), 
+	duration: float = 0.6,
+	pause_tree: bool = true
+) -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = 128 
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(canvas)
+	
+	var color_rect := ColorRect.new()
+	color_rect.color = transition_color
+	color_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	color_rect.scale = Vector2(1, 0)
+	canvas.add_child(color_rect)
+	
+	var was_paused_before = get_tree().paused
+	if pause_tree:
+		get_tree().paused = true
+	
+	# --- FADE IN ---
+	var tween_in := canvas.create_tween()
+	tween_in.tween_property(color_rect, "scale", Vector2(1, 1), duration)\
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	
+	await tween_in.finished
+	screen_covered.emit()
+	
+	if action.is_valid():
+		action.call()
+	
+	await get_tree().process_frame 
+	
+	# --- FADE OUT ---
+	var tween_out := canvas.create_tween()
+	tween_out.tween_property(color_rect, "scale", Vector2(1, 0), duration * 0.8)\
+		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	
+	await tween_out.finished
+	
+	# 3. Restauramos el estado de pausa original
+	if pause_tree and not was_paused_before:
+		get_tree().paused = false
+		
+	transition_finished.emit()
+	canvas.queue_free()
