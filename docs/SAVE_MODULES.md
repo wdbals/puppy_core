@@ -1,134 +1,86 @@
-# Guardado Modular
+# Save Modules
 
-El sistema de guardado se basa en modulos. Cada modulo conoce como capturar,
-validar y restaurar una parte del estado del juego.
+`SaveManager` stores independent sections in `user://saves/<slot>.cfg`. Each section
+is represented by a `SaveModule` that captures, validates, and restores one part of
+game state. Its three required methods provide error-reporting defaults so the API
+also works on Godot versions before abstract GDScript classes were introduced.
 
-## Contrato Base
-
-Todo modulo debe extender `SaveModule`:
+## Define a module
 
 ```gdscript
+class_name PlayerSaveModule
 extends SaveModule
 
-var coins: int = 0
-var position: Vector2 = Vector2.ZERO
+var player: Player
+
+func _init(player_node: Player) -> void:
+	player = player_node
 
 func get_module_name() -> String:
 	return "player"
 
 func capture_snapshot() -> Dictionary:
 	return {
-		"coins": coins,
-		"position": position
+		"position": player.global_position,
+		"health": player.health,
 	}
 
 func restore_snapshot(data: Dictionary) -> bool:
-	coins = data.get("coins", 0)
-	position = data.get("position", Vector2.ZERO)
+	player.global_position = data.position
+	player.health = data.health
 	return true
 
 func validate_data(data: Dictionary) -> bool:
-	return data.has("coins") and data.has("position")
+	return data.has("position") and data.has("health")
 ```
 
-## Ciclo De Escritura
+The module name is the ConfigFile section name. Keep it stable after publishing save
+files.
+
+## Write data
 
 ```gdscript
-SaveManager.write_module("slot_1", player_module)
+SaveManager.write_module("slot_1", player_save)
+SaveManager.write_modules_batch("slot_1", [player_save, world_save])
 ```
 
-Flujo interno:
+The manager loads the existing slot, calls `pre_save()`, captures each snapshot,
+writes the module sections, refreshes the shared timestamp, and saves the file once.
 
-1. Emite `saving(slot_name)`.
-2. Carga el archivo existente del slot, si existe.
-3. Llama `module.pre_save()`.
-4. Llama `module.capture_snapshot()`.
-5. Escribe los datos en la seccion `module.get_module_name()`.
-6. Actualiza `meta.last_updated`.
-7. Guarda en disco.
-8. Emite `save_completed(slot_name, success)`.
+Use the batch method for a complete checkpoint so every module is written from one
+logical game state.
 
-## Ciclo De Lectura
+## Read data
 
 ```gdscript
-var ok := SaveManager.read_module("slot_1", player_module)
+var player_ok := SaveManager.read_module("slot_1", player_save)
+var all_ok := SaveManager.read_modules_batch(
+	"slot_1",
+	[player_save, world_save]
+)
 ```
 
-Flujo interno:
+For each module, the manager reads its section, calls `validate_data()`, restores the
+snapshot, and then calls `post_load()`.
 
-1. Emite `loading(slot_name)`.
-2. Carga el archivo del slot.
-3. Busca una seccion con `module.get_module_name()`.
-4. Construye un `Dictionary` con las claves de esa seccion.
-5. Llama `module.validate_data(data)`.
-6. Si es valido, llama `module.restore_snapshot(data)`.
-7. Llama `module.post_load()`.
-8. Emite `load_completed(slot_name, success)`.
+## Versioning save schemas
 
-## Guardar Varios Modulos
+`SaveModule.get_module_version()` returns a schema version for use by project code.
+`SaveManager` does not yet persist or migrate schema versions automatically. A game
+that changes published save data should store a version in each module section and
+migrate older dictionaries before restoring them.
 
-```gdscript
-SaveManager.write_modules_batch("slot_1", [
-	player_save,
-	inventory_save,
-	world_save
-])
-```
+## Encryption
 
-Usa batch cuando varias partes del estado deben quedar sincronizadas en el mismo
-archivo.
+`EngineConfig.SAVE_USE_ENCRYPTION` selects ConfigFile password encryption. The
+current password is an internal development default. Published games should inject
+their own key strategy instead of treating a source-code password as secure secret
+storage.
 
-## Nombres De Modulo
+## Guidelines
 
-`get_module_name()` debe ser unico por slot. Ejemplos:
-
-- `player`
-- `inventory`
-- `world`
-- `settings`
-- `quest_state`
-
-Evita nombres derivados de escenas temporales si el estado debe sobrevivir a
-renombres.
-
-## Versionado
-
-`SaveModule.get_module_version()` existe para compatibilidad, pero `SaveManager`
-todavia no escribe ni valida versiones automaticamente. Patron recomendado:
-
-```gdscript
-func capture_snapshot() -> Dictionary:
-	return {
-		"version": get_module_version(),
-		"coins": coins
-	}
-
-func validate_data(data: Dictionary) -> bool:
-	return data.get("version", "0.0.0") == get_module_version()
-```
-
-Para proyectos con saves persistentes entre versiones, agrega migraciones dentro
-del modulo antes de restaurar.
-
-## Encriptacion
-
-Si `EngineConfig.SAVE_USE_ENCRYPTION` es `true`, `SaveManager` usa
-`ConfigFile.load_encrypted_pass()` y `save_encrypted_pass()`.
-
-La clave actual esta definida dentro de `SaveManager`:
-
-```gdscript
-const _SECRET_KEY: String = "puppies-x7z-secure"
-```
-
-Para juegos publicados conviene mover esta decision a configuracion por proyecto
-o a una estrategia mas robusta.
-
-## Buenas Practicas
-
-- Mantener cada modulo pequeno y con una responsabilidad clara.
-- Validar datos antes de restaurar.
-- Usar valores por defecto al leer claves opcionales.
-- Guardar identificadores estables, no referencias directas a nodos.
-- Evitar guardar estado derivado que pueda recalcularse.
-- Usar batch para checkpoints o guardados manuales completos.
+- Give each module one clear responsibility.
+- Store stable identifiers instead of node references.
+- Validate external data before restoring it.
+- Avoid saving values that can be derived safely.
+- Keep migration code for every save schema shipped to players.

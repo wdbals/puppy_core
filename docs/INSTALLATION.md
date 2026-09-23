@@ -1,77 +1,79 @@
-# Instalacion
+# Installation
 
-Esta guia cubre como copiar `puppies_engine` a un proyecto Godot y dejarlo listo
-para uso.
+Puppy Core supports Godot 4 and later. Add the complete repository to the project,
+then enable only the services the game uses.
 
-## 1. Copiar La Carpeta
+## Add the files
 
-Copia `puppies_engine/` a la raiz del proyecto:
+As a Git submodule:
 
-```text
-res://puppies_engine/
+```bash
+git submodule add https://github.com/wdbals/puppy_core.git puppy_core
+git submodule update --init
 ```
 
-No muevas los scripts internos sin actualizar las rutas de autoload y referencias.
+After cloning a game that already contains the submodule:
 
-## 2. Registrar Autoloads
+```bash
+git clone --recurse-submodules <game-repository-url>
+```
 
-En `Project Settings > Autoload`, registra:
+Keeping Puppy Core at `res://puppy_core/` preserves the paths used throughout this
+documentation.
 
-| Orden | Nombre | Script |
+## Register optional autoloads
+
+Open `Project > Project Settings > Globals > Autoload` and register the services
+required by the game:
+
+| Name | Script | Required dependencies |
 | --- | --- | --- |
-| 1 | `GameManager` | `res://puppies_engine/core/autoload/game_manager.gd` |
-| 2 | `AudioManager` | `res://puppies_engine/core/autoload/audio_manager.gd` |
-| 3 | `InputManager` | `res://puppies_engine/core/autoload/input_manager.gd` |
-| 4 | `SaveManager` | `res://puppies_engine/core/autoload/save_manager.gd` |
-| 5 | `VideoManager` | `res://puppies_engine/core/autoload/video_manager.gd` |
+| `GameManager` | `res://puppy_core/autoloads/game_manager.gd` | None |
+| `AudioManager` | `res://puppy_core/autoloads/audio_manager.gd` | None |
+| `InputManager` | `res://puppy_core/autoloads/input_manager.gd` | None |
+| `SaveManager` | `res://puppy_core/autoloads/save_manager.gd` | None |
+| `VideoManager` | `res://puppy_core/autoloads/video_manager.gd` | None |
 
-El orden importa porque `AudioManager` se conecta a senales de `GameManager` en
-`_ready()`.
+Do not register an unused service. Files present in the repository do not become
+singletons automatically.
 
-## 3. Configurar El Proyecto
+If project code connects two services, register that project coordinator after the
+services it references.
 
-Revisa `res://puppies_engine/data/engine_config.gd`:
+## Configure the project
 
-- Audio: buses, volumenes iniciales, tamano del pool de sonidos y fades.
-- Video: resoluciones disponibles, modo de ventana y VSync inicial.
-- Input: deadzone, buffer, sensibilidad del mouse y rebinding.
-- Save: cantidad de slots, intervalo de autosave y encriptacion.
-- Game: velocidad, FPS fisico y escala de tiempo.
+Review `res://puppy_core/data/engine_config.gd`. It contains default audio buses,
+pool size, fades, display resolutions, save behavior, and input settings.
 
-## 4. Configurar Input Map
+Define the actions used by the game in `Project Settings > Input Map`. The optional
+`InputManager` reads actions that exist when it starts.
 
-`InputManager` lee las acciones existentes en `InputMap` al iniciar. Define tus
-acciones antes de depender de:
+`AudioManager.setup_audio_buses()` creates missing `Master`, `SFX`, `Music`, and
+`Voice` buses. Projects with custom audio layouts can extend the defaults or use
+Godot's audio bus layout resource.
 
-```gdscript
-InputManager.is_action_pressed("move_left")
-InputManager.is_action_just_pressed("jump")
-InputManager.get_action_strength("aim_x")
+## Verify the installation
+
+Run an editor import from the project root:
+
+```bash
+godot --headless --path . --editor --quit
 ```
 
-Si agregas acciones en runtime, considera reinicializar estados o extender el
-manager para registrar acciones nuevas.
+Then run the project's main scene and check that registered autoloads appear below
+`/root` in the remote scene tree.
 
-## 5. Audio Buses
+## Update a pinned version
 
-`AudioManager.setup_audio_buses()` crea si faltan estos buses:
+Each consuming repository stores an exact Puppy Core commit:
 
-- `Master`
-- `SFX`
-- `Music`
-- `Voice`
-
-Tambien aplica los volumenes iniciales declarados en `EngineConfig.DEFAULT_AUDIO_BUSES`.
-
-## 6. Verificacion Manual
-
-Al ejecutar el juego deberias ver logs similares:
-
-```text
-GameManager iniciado - Puppies Engine v1.0.0
-AudioManager iniciado
-InputManager iniciado
-VideoManager iniciado - Resoluciones disponibles: ...
+```bash
+git -C puppy_core fetch --tags
+git -C puppy_core checkout v0.2.0
+git add puppy_core
+git commit -m "build: update puppy_core to v0.2.0"
 ```
 
-Si hay errores de autoload, revisa nombres exactos, orden y rutas.
+Make library changes on short-lived feature branches in the Puppy Core repository.
+Keep project-specific changes in the consuming game instead of maintaining a branch
+of Puppy Core for every game.

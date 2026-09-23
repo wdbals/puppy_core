@@ -1,110 +1,107 @@
-# Puppies Core
+# Puppy Core
 
-Base reutilizable para juegos en Godot 4. Centraliza servicios comunes en autoloads:
-audio, ciclo de vida del juego, input, video y guardado modular.
+Puppy Core is a small collection of reusable Godot 4+ services and gameplay
+components. Every autoload is optional. Projects choose the services they need and
+keep game-specific rules in their own source tree.
 
-## Objetivo
+The project is currently pre-1.0. Public APIs may change between minor releases
+while the module boundaries settle.
 
-`puppies_core` no pretende ser un framework cerrado. Es una capa pequena y
-copiable que deja resueltas las necesidades repetidas de un juego:
+## Features
 
-- Estados globales del juego y cambios de escena.
-- Transiciones de escena con eventos sincronizables.
-- Audio por buses, musica, efectos y comportamiento durante pausas/transiciones.
-- Input unificado para teclado, mouse y gamepad, con deadzones y buffer.
-- Configuracion de resolucion, pantalla completa y VSync.
-- Guardado por modulos independientes.
-- Enums y constantes compartidas para evitar strings magicos.
+- Independent audio, input, save, video, and lifecycle autoloads.
+- Non-spatial, positional 2D, and positional 3D audio playback.
+- Scene transitions and pause control without game-specific state assumptions.
+- Reusable health, hitbox, hurtbox, movement, camera, and animation components.
+- A `HitData` payload that keeps damage, knockback, source, and hit position
+  together.
+- Modular save data through the `SaveModule` base class.
 
-## Estructura
+## Structure
 
 ```text
-puppies_engine/
-  core/
-    autoload/
-      audio_manager.gd
-      game_manager.gd
-      input_manager.gd
-      save_manager.gd
-      video_manager.gd
-    modules/
-      save_module.gd
+puppy_core/
+  autoloads/
+    audio_manager.gd
+    debug_overlay.gd
+    game_manager.gd
+    input_manager.gd
+    save_manager.gd
+    video_manager.gd
+  components/
+    animation/
+    camera/
+    combat/
+    movement/
   data/
-    audio_enums.gd
-    engine_config.gd
-    game_enums.gd
-    input_enums.gd
-    save_enums.gd
+  modules/
+  docs/
 ```
 
-## Requisitos
+`autoloads/` is flat because there is no second framework layer inside Puppy Core.
+Components and data types can be used without enabling any singleton.
 
-- Godot 4.2 o 4.3, segun `EngineConfig.ENGINE_SUPPORTED_GODOT_VERSIONS`.
-- Registrar los managers como autoloads.
-- Mantener los `class_name` de enums y configuracion disponibles globalmente.
+## Installation
 
-## Instalacion En Otro Juego
+Add the repository to a Godot project, preferably as a submodule:
 
-1. Copia la carpeta `puppies_core/` al proyecto Godot. O bien, añade el repositorio como submodulo.
 ```bash
-git submodule add https://github.com/puppies-team/puppy_core.git
+git submodule add https://github.com/wdbals/puppy_core.git puppy_core
+git submodule update --init
 ```
-2. Registra estos autoloads en `Project Settings > Autoload`, en este orden:
 
-| Nombre | Script |
+Register only the services needed by the project:
+
+| Autoload name | Path |
 | --- | --- |
-| `GameManager` | `res://puppies_engine/core/autoload/game_manager.gd` |
-| `AudioManager` | `res://puppies_engine/core/autoload/audio_manager.gd` |
-| `InputManager` | `res://puppies_engine/core/autoload/input_manager.gd` |
-| `SaveManager` | `res://puppies_engine/core/autoload/save_manager.gd` |
-| `VideoManager` | `res://puppies_engine/core/autoload/video_manager.gd` |
+| `GameManager` | `res://puppy_core/autoloads/game_manager.gd` |
+| `AudioManager` | `res://puppy_core/autoloads/audio_manager.gd` |
+| `InputManager` | `res://puppy_core/autoloads/input_manager.gd` |
+| `SaveManager` | `res://puppy_core/autoloads/save_manager.gd` |
+| `VideoManager` | `res://puppy_core/autoloads/video_manager.gd` |
 
-3. Ajusta constantes del proyecto en `data/engine_config.gd`.
-4. Define las acciones de input del juego en `Project Settings > Input Map`.
-5. Usa los managers desde cualquier script mediante sus nombres de autoload.
-
-## Uso Rapido
+The services do not require each other. A game can connect them from its own
+coordinator when it wants integrated behavior:
 
 ```gdscript
-# Cambiar escena con transicion y apagar musica.
-GameManager.change_scene_styled(
-	"res://scenes/level_01.tscn",
-	AudioEnums.AudioBehavior.STOP_MUSIC
-)
+# game_content/autoloads/game_session.gd
+extends Node
 
-# Reproducir audio.
-AudioManager.play_music(preload("res://audio/theme.ogg"), "theme")
-AudioManager.play_sound(preload("res://audio/jump.wav"), AudioEnums.BusName.SFX)
-
-# Leer input con deadzone aplicada.
-if InputManager.is_action_just_pressed("jump"):
-	jump()
-
-# Alternar pantalla completa.
-VideoManager.toggle_fullscreen()
+func _ready() -> void:
+	GameManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
+	GameManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
 ```
 
-## Documentacion
+See [Installation](docs/INSTALLATION.md) for the full setup.
 
-- [Instalacion](docs/INSTALLATION.md)
-- [Referencia de API](docs/API_REFERENCE.md)
-- [Guardado modular](docs/SAVE_MODULES.md)
-- [Guia de reutilizacion](docs/REUSE_GUIDE.md)
+## Quick examples
 
-## Convenciones
+```gdscript
+GameManager.change_scene_styled("res://scenes/level_01.tscn")
 
-- Los managers son singletons/autoloads y forman la API publica principal.
-- `EngineConfig` contiene valores por defecto modificables por juego.
-- Los enums de `data/` son contratos compartidos entre managers y codigo de juego.
-- Las escenas de menu, nivel y cutscene se detectan actualmente por nombre de archivo.
-  Ver `GameManager._update_game_state_from_scene()`.
+AudioManager.play_music(preload("res://audio/theme.ogg"), "theme")
+AudioManager.play_sound(preload("res://audio/click.wav"))
+AudioManager.play_sound_2d(hit_sound, global_position)
+AudioManager.play_sound_3d(explosion_sound, global_position)
+```
 
-## Estado Actual
+Combat events carry one object instead of parallel arguments:
 
-Esta documentacion describe la API existente. Algunas areas son intencionalmente
-minimas o pendientes:
+```gdscript
+func _on_damaged(hit: HitData) -> void:
+	velocity += hit.knockback
+	print("Damage: ", hit.damage)
+```
 
-- `InputManager.restore_default_binding()` todavia no restaura bindings por defecto.
-- `VideoManager.setup_viewport_scaling()` es un placeholder.
-- `SaveManager` guarda en `user://saves/<slot>.cfg` y usa una clave interna fija si
-  `SAVE_USE_ENCRYPTION` esta activo.
+## Design boundary
+
+Puppy Core owns reusable mechanisms. The consuming project owns rules such as
+difficulty modes, story states, wave progression, scene-name conventions, and the
+meaning of pause or victory. See the [Reuse Guide](docs/REUSE_GUIDE.md) for examples.
+
+## Documentation
+
+- [Installation](docs/INSTALLATION.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [Reuse Guide](docs/REUSE_GUIDE.md)
+- [Save Modules](docs/SAVE_MODULES.md)

@@ -1,263 +1,182 @@
-# Referencia De API
-
-Los managers registrados como autoloads son la API publica principal.
+# API Reference
 
 ## GameManager
 
-Gestiona estado global, pausa, cambios de escena y transiciones.
+`GameManager` handles application shutdown, SceneTree pause, scene changes, and a
+simple color transition. It does not track game states, difficulty, language, or
+playtime.
 
-### Senales
+### Signals
 
-| Senal | Cuando ocurre |
+| Signal | Meaning |
 | --- | --- |
-| `game_paused` | Al pausar el juego. |
-| `game_resumed` | Al reanudar el juego. |
-| `game_ready_finished` | Despues de inicializar managers con `call_deferred`. |
-| `game_state_changed(new_state)` | Cuando cambia `GameEnums.GameState`. |
-| `close_game_requested` | Solicitud de cierre del juego. |
-| `language_changed(new_language)` | Cambio de idioma. |
-| `scene_loaded(scene_name)` | Despues de cambiar escena. |
-| `transition_started(to_scene_path, duration, audio_behavior)` | Inicio de transicion. |
-| `screen_covered` | La pantalla ya esta cubierta; momento seguro para cargar/preparar. |
-| `transition_finished` | La transicion termino. |
+| `game_paused` | The SceneTree was paused through the manager. |
+| `game_resumed` | The SceneTree was resumed through the manager. |
+| `game_ready` | The autoload completed `_ready()`. |
+| `quit_requested` | The application is about to quit. |
+| `scene_loaded(scene_path)` | A requested scene change succeeded. |
+| `transition_started(scene_path, duration)` | A scene or action transition started. |
+| `screen_covered` | The viewport is fully covered. |
+| `transition_finished` | The transition completed. |
 
-### Metodos Principales
+### Scene and lifecycle methods
 
 ```gdscript
 GameManager.change_scene("res://scenes/menu.tscn")
-```
-
-Cambia escena sin transicion visual. Emite `transition_started` con duracion `0.0`.
-
-```gdscript
 GameManager.change_scene_styled(
 	"res://scenes/level_01.tscn",
-	AudioEnums.AudioBehavior.SCENE_AUTO,
 	Color("080d1c"),
 	0.6
 )
+GameManager.execute_with_transition(setup_level)
+GameManager.request_quit()
 ```
 
-Cambia escena con cobertura visual y eventos de transicion.
+`execute_with_transition()` invokes its callable while the viewport is covered. It
+can temporarily pause the SceneTree during the operation.
+
+### Pause methods
 
 ```gdscript
 GameManager.pause_game([pause_menu])
 GameManager.resume_game()
 GameManager.toggle_pause([pause_menu])
+var paused := GameManager.is_game_paused()
 ```
 
-Pausa usando `get_tree().paused`. Los nodos excluidos pasan temporalmente a
-`Node.PROCESS_MODE_ALWAYS`.
-
-```gdscript
-GameManager.change_game_state(GameEnums.GameState.PLAYING)
-GameManager.get_playtime()
-GameManager.is_in_gameplay()
-```
-
-### Deteccion De Estado Por Escena
-
-`GameManager` infiere estado desde el nombre del archivo:
-
-- Contiene `menu`: `MAIN_MENU`
-- Contiene `level` o `gameplay`: `PLAYING`
-- Contiene `cutscene`: `CUTSCENE`
-
-Para juegos grandes conviene reemplazar esta heuristica por metadata de escena o
-una tabla explicita.
+Nodes passed in `excluded_nodes` temporarily use `PROCESS_MODE_ALWAYS` and return
+to their previous processing mode on resume.
 
 ## AudioManager
 
-Gestiona musica, sonidos, buses y comportamiento ante pausa/transicion.
+`AudioManager` handles music, pooled non-spatial effects, one-shot positional audio,
+and bus volume. It does not depend on any other autoload.
 
-### Senales
-
-| Senal | Cuando ocurre |
-| --- | --- |
-| `bus_volume_changed(bus_name, volume)` | Cambio de volumen de bus. |
-| `sound_played(sound_name, sound_type)` | Reproduccion de efecto. |
-| `music_changed(music_name)` | Cambio de musica actual. |
-| `music_stoped` | Musica detenida. |
-| `music_finished` | El stream de musica termino. |
-
-### Musica
+### Music
 
 ```gdscript
-AudioManager.play_music(music_stream, "battle_theme", 1.0)
+AudioManager.play_music(theme, "main_theme", 0.5)
 AudioManager.stop_music(0.5)
-AudioManager.get_current_music_name()
-AudioManager.is_music_playing()
+AudioManager.fade_in_music(0.5)
+AudioManager.fade_out_music(0.5)
 ```
 
-Si `fade_duration` es `-1.0`, usa `EngineConfig.AUDIO_DEFAULT_MUSIC_FADE`.
+### Non-spatial effects
 
-### Sonidos
+Use non-spatial playback for UI and sounds that should not be positioned in the
+world:
 
 ```gdscript
-AudioManager.play_sound(jump_sfx, AudioEnums.BusName.SFX)
-AudioManager.stop_all_sounds()
+AudioManager.play_sound(click_sound, AudioEnums.BusName.SFX)
 ```
 
-Los sonidos usan un pool inicial definido por `EngineConfig.AUDIO_SOUND_POOL_SIZE`.
-Si el pool se llena, se crea un player adicional.
+### Positional effects
 
-### Volumen Y Mute
+Use positional playback for one-shot world sounds:
+
+```gdscript
+AudioManager.play_sound_2d(
+	hit_sound,
+	global_position,
+	AudioEnums.BusName.SFX,
+	1200.0,
+	1.0
+)
+
+AudioManager.play_sound_3d(
+	explosion_sound,
+	global_position,
+	AudioEnums.BusName.SFX,
+	50.0,
+	5.0
+)
+```
+
+The returned `AudioStreamPlayer2D` or `AudioStreamPlayer3D` is automatically freed
+when playback finishes. For looping sounds or audio that must follow a moving
+object, add a positional player directly below that object instead.
+
+The active viewport needs an `AudioListener2D` or `AudioListener3D` when the default
+listener behavior is not sufficient.
+
+### Bus and pause control
 
 ```gdscript
 AudioManager.set_bus_volume(AudioEnums.BusName.MUSIC, 0.5)
-var volume := AudioManager.get_bus_volume(AudioEnums.BusName.MUSIC)
 AudioManager.mute_bus(AudioEnums.BusName.SFX)
 AudioManager.unmute_bus(AudioEnums.BusName.SFX)
-var muted := AudioManager.toggle_bus_mute(AudioEnums.BusName.SFX)
+AudioManager.toggle_bus_mute(AudioEnums.BusName.SFX)
+AudioManager.set_game_paused(true)
 ```
 
-El volumen se limita a `0.0..1.0` y se convierte a decibeles.
+`set_game_paused()` is an explicit integration point. A game coordinator may connect
+it to `GameManager`, but AudioManager never assumes that GameManager exists.
 
-### Transiciones Y Pausa
+## Combat
 
-`AudioManager` escucha:
+### HitData
 
-- `GameManager.game_paused`
-- `GameManager.game_resumed`
-- `GameManager.transition_started`
+`HitData` is a runtime payload with these fields:
 
-Durante pausa baja el volumen master y pausa sonidos en buses `SFX` y `Voice`.
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `damage` | `float` | Health reduction requested by the hit. |
+| `knockback` | `Vector2` | World-space impulse or velocity contribution. |
+| `source` | `Node2D` | Node that produced the hit. |
+| `hit_position` | `Vector2` | World-space position of the target when hit. |
+
+### Hitbox and HurtBox
+
+`Hitbox` builds a `HitData` object and calls `HurtBox.receive_hit()`. A hitbox can
+calculate knockback from its facing direction or radially away from itself:
+
+```gdscript
+hitbox.knockback_direction = Hitbox.KnockbackDirection.AWAY_FROM_HITBOX
+hitbox.knockback_force = 150.0
+```
+
+Signals carry the same payload:
+
+```gdscript
+func _on_damaged(hit: HitData) -> void:
+	velocity += hit.knockback
+
+func _on_hit_delivered(target: HurtBox, hit: HitData) -> void:
+	print(target, " received ", hit.damage)
+```
 
 ## InputManager
 
-Abstrae input de teclado/mouse y gamepad, con deadzones por accion y buffer.
-
-### Senales
-
-| Senal | Cuando ocurre |
-| --- | --- |
-| `input_device_changed(device_type)` | Cambia entre teclado/mouse y gamepad. |
-| `control_rebound(action, old_event, new_event)` | Se reasigna una accion. |
-| `input_buffer_triggered(action)` | Una accion esta dentro del tiempo de buffer. |
-| `action_deadzone_changed(action, deadzone)` | Cambio de deadzone. |
-
-### Acciones
+The input manager provides device detection, per-action deadzones, buffered input,
+and rebinding:
 
 ```gdscript
-InputManager.is_action_pressed("move_left")
-InputManager.is_action_just_pressed("jump")
-InputManager.is_action_just_released("attack")
+InputManager.is_action_pressed("jump")
+InputManager.is_action_just_pressed("attack")
 InputManager.get_action_strength("move_right")
-InputManager.get_action_raw_strength("move_right")
-```
-
-Los metodos principales leen el estado cacheado por el manager y aplican deadzone.
-
-### Deadzones
-
-```gdscript
 InputManager.set_action_deadzone("aim_x", 0.25)
-InputManager.get_action_deadzone("aim_x")
-InputManager.set_actions_deadzone(["aim_x", "aim_y"], 0.25)
-InputManager.set_gamepad_axes_deadzone(0.3)
-InputManager.apply_default_deadzone_to_all_actions()
+InputManager.rebind_action("jump", new_event)
 ```
-
-### Buffer
-
-```gdscript
-InputManager.input_buffer_triggered.connect(_on_buffered_input)
-InputManager.clear_input_buffer("jump")
-InputManager.clear_all_input_buffers()
-```
-
-El tiempo de buffer viene de `EngineConfig.INPUT_BUFFER_TIME`.
-
-### Rebinding
-
-```gdscript
-var ok := InputManager.rebind_action("jump", new_event)
-var primary := InputManager.get_action_event("jump")
-var all_events := InputManager.get_action_events("jump")
-```
-
-El rebinding depende de `EngineConfig.INPUT_ALLOW_INPUT_REBINDING`.
 
 ## VideoManager
-
-Gestiona resolucion, modo de pantalla, VSync y refresco de UI.
-
-### Senales
-
-| Senal | Cuando ocurre |
-| --- | --- |
-| `resolution_changed(new_resolution)` | Cambio de resolucion. |
-| `display_mode_changed(new_mode)` | Cambio de modo de ventana. |
-| `vsync_mode_changed(new_mode)` | Cambio de VSync. |
-| `fullscreen_toggled(is_fullscreen)` | Toggle de pantalla completa. |
-
-### Resolucion
 
 ```gdscript
 VideoManager.set_resolution(Vector2i(1280, 720))
 VideoManager.set_resolution_by_index(0)
-VideoManager.set_resolution_smooth(Vector2i(1920, 1080), 0.25)
-VideoManager.set_resolution_smooth_by_index(1, 0.25)
-VideoManager.get_current_resolution()
-VideoManager.get_available_resolutions()
-VideoManager.get_current_resolution_index()
-```
-
-Las resoluciones se filtran contra el tamano de pantalla y se ordenan de mayor a
-menor.
-
-### Pantalla Y VSync
-
-```gdscript
-VideoManager.set_display_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-var fullscreen := VideoManager.toggle_fullscreen()
-VideoManager.is_fullscreen()
-VideoManager.get_current_display_mode()
-
+VideoManager.toggle_fullscreen()
 VideoManager.set_vsync_mode(DisplayServer.VSYNC_ENABLED)
-var enabled := VideoManager.toggle_vsync()
-VideoManager.is_vsync_enabled()
 ```
 
-### UI
-
-```gdscript
-VideoManager.refresh_ui_after_resolution_change()
-VideoManager.center_window()
-VideoManager.apply_engine_defaults()
-```
-
-`refresh_ui_after_resolution_change()` llama `_on_resolution_changed` en el grupo
-`ui_responsive`.
+Available resolutions come from `EngineConfig` and are filtered against the current
+screen size.
 
 ## SaveManager
-
-Lee y escribe modulos de guardado. Ver [Guardado modular](SAVE_MODULES.md) para
-el flujo completo.
-
-### Senales
-
-| Senal | Cuando ocurre |
-| --- | --- |
-| `saving(slot)` | Inicio de escritura. |
-| `save_completed(slot, success)` | Escritura completada. |
-| `loading(slot)` | Inicio de lectura. |
-| `load_completed(slot, success)` | Lectura completada. |
-
-### Escritura Y Lectura
 
 ```gdscript
 SaveManager.write_module("slot_1", player_save)
 SaveManager.write_modules_batch("slot_1", [player_save, world_save])
-
-var ok := SaveManager.read_module("slot_1", player_save)
-var all_ok := SaveManager.read_modules_batch("slot_1", [player_save, world_save])
+SaveManager.read_module("slot_1", player_save)
+SaveManager.read_modules_batch("slot_1", [player_save, world_save])
 ```
 
-Los datos se guardan en:
-
-```text
-user://saves/<slot>.cfg
-```
-
-Cada modulo se guarda como una seccion del `ConfigFile`.
+See [Save Modules](SAVE_MODULES.md) for the `SaveModule` contract.

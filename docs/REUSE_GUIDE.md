@@ -1,128 +1,87 @@
-# Guia De Reutilizacion
+# Reuse Guide
 
-Esta guia ayuda a mantener `puppies_engine` como una base copiable entre juegos.
+Puppy Core should contain mechanisms that remain useful when copied into a game
+with different rules, scenes, controls, and content.
 
-## Que Mantener Generico
+## Library boundary
 
-Deja en `puppies_engine` solo sistemas transversales:
+Good Puppy Core candidates include:
 
-- Audio global.
-- Estado de juego y transiciones.
-- Input y rebinding.
-- Video y ventana.
-- Guardado modular.
-- Enums y configuracion compartida.
+- Audio playback and bus control.
+- Scene transitions and pause primitives.
+- Input normalization and rebinding.
+- Window and display settings.
+- Save-file orchestration.
+- Generic health and collision-based combat components.
 
-Evita meter aqui logica especifica de un juego, como combate, inventario concreto,
-enemigos, dialogos de una historia o rutas de escenas particulares.
+Keep these in the consuming project:
 
-## Donde Personalizar Por Juego
+- Difficulty settings such as one-hit mode.
+- Story, menu, cutscene, victory, or game-over states.
+- Scene paths and filename conventions.
+- Wave, quest, inventory, and character rules.
+- Decisions about how two independent services interact.
 
-Puntos esperados de personalizacion:
-
-- `EngineConfig`: valores por defecto, resoluciones, audio, input y save.
-- `GameEnums`: estados, equipos, direcciones o idiomas propios del proyecto.
-- `AudioEnums`: nuevos tipos de audio o prioridades si el juego lo necesita.
-- Modulos que extiendan `SaveModule`.
-- Escenas y scripts del juego fuera de `puppies_engine`.
-
-## Contratos Publicos
-
-Trata como API publica:
-
-- Nombres de autoload: `GameManager`, `AudioManager`, `InputManager`,
-  `SaveManager`, `VideoManager`.
-- Senales documentadas en `API_REFERENCE.md`.
-- Metodos publicos de managers.
-- `SaveModule` como clase base.
-- Enums en `data/`.
-
-Antes de cambiar firmas publicas, revisa juegos existentes que ya dependan del
-engine.
-
-## Convenciones De Escenas
-
-El estado de juego se infiere por nombre de archivo:
-
-```text
-menu      -> MAIN_MENU
-level     -> PLAYING
-gameplay  -> PLAYING
-cutscene  -> CUTSCENE
-```
-
-Para reutilizacion en muchos juegos, una mejora recomendable es crear una tabla:
+For example, an Equinoccio coordinator may own both its run settings and the desired
+pause/audio relationship:
 
 ```gdscript
-const SCENE_STATES := {
-	"res://scenes/main_menu.tscn": GameEnums.GameState.MAIN_MENU,
-	"res://scenes/level_01.tscn": GameEnums.GameState.PLAYING
-}
+extends Node
+
+var one_hit_mode := false
+
+func _ready() -> void:
+	GameManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
+	GameManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
 ```
 
-Eso evita depender de nombres de archivo.
+This keeps both reusable services independently installable.
 
-## Convenciones De Audio
+## Public API
 
-Usa estos buses como base:
+Treat these as public contracts:
 
-- `Master`: volumen global.
-- `SFX`: efectos de gameplay y UI.
-- `Music`: musica.
-- `Voice`: voces o dialogos.
+- Autoload names selected by the consuming project.
+- Signals and public methods documented in `API_REFERENCE.md`.
+- `class_name` types such as `HitData`, `Hitbox`, `HurtBox`, `Health`, and
+  `SaveModule`.
+- Exported properties stored in `.tscn` and `.tres` resources.
 
-Si un juego necesita mas buses, agregalos en `EngineConfig.DEFAULT_AUDIO_BUSES` y
-extiende `AudioEnums.BusName` junto con el mapeo privado de `AudioManager`.
+Renaming an exported property requires updating existing scenes. Changing a signal's
+arguments requires updating every connection. During the pre-1.0 phase, group such
+changes into intentional minor releases.
 
-## Convenciones De Input
+## Language and naming
 
-Define acciones semanticas, no teclas concretas:
+Puppy Core source, public identifiers, diagnostics, and documentation use English.
+Consuming games may use any language internally. Keeping the shared module in one
+language makes search results and API usage consistent across projects.
 
-```text
-move_left
-move_right
-jump
-attack
-pause
-ui_accept
-ui_cancel
-```
+## Configuration
 
-El codigo del juego deberia consultar acciones, no eventos fisicos. Eso permite
-soportar teclado, mouse, gamepad y rebinding sin cambiar gameplay.
+`EngineConfig` currently provides library defaults. Avoid editing it for a single
+game unless the change is useful to all consumers. When projects need substantially
+different defaults, introduce a project-owned configuration resource and pass it to
+the relevant service from the game's bootstrap code.
 
-## Convenciones De Guardado
+## Audio ownership
 
-Modela el save como un conjunto de modulos independientes:
+Use `AudioManager.play_sound()` for UI and non-spatial sounds. Use
+`play_sound_2d()` or `play_sound_3d()` for short world events. A moving or looping
+sound belongs to its entity as an `AudioStreamPlayer2D` or `AudioStreamPlayer3D`.
 
-```text
-player
-inventory
-world
-settings
-quests
-```
+This distinction prevents the global manager from becoming responsible for entity
+lifetime and movement.
 
-Cada modulo debe poder validar y restaurar su propia seccion. El manager solo
-orquesta lectura/escritura.
+## Combat payloads
 
-## Checklist Para Copiar A Un Juego Nuevo
+Keep impact information together in `HitData`. Add broadly reusable fields there
+only when multiple games need them. Project-specific status effects can subclass or
+wrap the payload, or react to `HurtBox.damaged` in game code.
 
-- Copiar `puppies_engine/`.
-- Registrar autoloads en el orden documentado.
-- Ajustar `EngineConfig`.
-- Crear acciones en `InputMap`.
-- Crear modulos de guardado necesarios.
-- Revisar nombres de escenas o reemplazar la heuristica de estado.
-- Probar pausa, cambio de escena, musica, SFX, resolucion y save/load.
+## Versioning
 
-## Mejoras Recomendadas
-
-Estas mejoras harian la base mas robusta sin romper su filosofia:
-
-- Separar `EngineConfig` base de una configuracion por juego.
-- Implementar restauracion de bindings por defecto en `InputManager`.
-- Persistir configuracion de video/audio/input usando `SaveModule`.
-- Reemplazar deteccion de estado por nombre de escena con metadata explicita.
-- Versionar modulos de guardado dentro del archivo.
-- Mover la clave de encriptacion a una estrategia configurable.
+Use one stable `main` branch and short-lived branches per reusable change. Tag
+pre-1.0 releases as `v0.1.0`, `v0.2.0`, and so on. Each consuming game pins an exact
+submodule commit. Do not maintain a permanent Puppy Core branch per game; place
+project adaptations beside the game's content instead.
