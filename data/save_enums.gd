@@ -1,65 +1,58 @@
 class_name SaveEnums
-## Enums para sistema de guardado
+## Shared types for the save system.
 
 enum SaveResult {
-	SUCCESS = 0,
-	ERROR_INVALID_SLOT = 1,
-	ERROR_FILE_WRITE = 2,
-	ERROR_FILE_READ = 3,
-	ERROR_VERSION_MISMATCH = 4,
-	ERROR_MODULE_FAILED = 5,
-	ERROR_LOAD_IN_PROGRESS = 6
+	SUCCESS,
+	ERROR_INVALID_SLOT,
+	ERROR_FILE_WRITE,
+	ERROR_FILE_READ,
+	ERROR_VERSION_MISMATCH,
+	ERROR_MODULE_FAILED,
+	ERROR_LOAD_IN_PROGRESS,
 }
 
 enum SavePriority {
-	LOW = 0,       # Guardado automático en segundo plano
-	NORMAL = 1,    # Guardado manual del jugador
-	HIGH = 2,      # Guardado crítico (checkpoint)
-	CRITICAL = 3   # Guardado forzado (antes de salir)
+	LOW,
+	NORMAL,
+	HIGH,
+	CRITICAL,
 }
 
 enum SaveType {
-	MANUAL = 0,    # Guardado manual del jugador
-	AUTO = 1,      # Guardado automático
-	CHECKPOINT = 2, # Guardado en checkpoint
-	QUICK = 3      # Guardado rápido
+	MANUAL,
+	AUTO,
+	CHECKPOINT,
+	QUICK,
 }
 
 enum CompressionMode {
-	NONE = 0,      # Sin compresión
-	GZIP = 1,      # Compresión GZIP (para texto)
-	LZ4 = 2        # Compresión LZ4 (rápida)
+	NONE,
+	GZIP,
+	LZ4,
 }
 
 enum EncryptionMode {
-	NONE = 0,      # Sin encriptación
-	AES = 1,       # Encriptación AES
-	CUSTOM = 2     # Encriptación personalizada
+	NONE,
+	AES,
+	CUSTOM,
 }
 
-# MÉTODOS UTILITARIOS
 
 static func get_save_result_message(result: SaveResult) -> String:
 	match result:
-		SaveResult.SUCCESS:
-			return "Operación completada exitosamente"
-		SaveResult.ERROR_INVALID_SLOT:
-			return "Slot de guardado inválido"
-		SaveResult.ERROR_FILE_WRITE:
-			return "Error al escribir archivo de guardado"
-		SaveResult.ERROR_FILE_READ:
-			return "Error al leer archivo de guardado"
-		SaveResult.ERROR_VERSION_MISMATCH:
-			return "Versión de guardado incompatible"
-		SaveResult.ERROR_MODULE_FAILED:
-			return "Error en módulo de guardado"
-		SaveResult.ERROR_LOAD_IN_PROGRESS:
-			return "No se puede guardar mientras se carga"
-		_:
-			return "Error desconocido"
+		SaveResult.SUCCESS: return "Operation completed successfully"
+		SaveResult.ERROR_INVALID_SLOT: return "Invalid save slot"
+		SaveResult.ERROR_FILE_WRITE: return "Could not write save file"
+		SaveResult.ERROR_FILE_READ: return "Could not read save file"
+		SaveResult.ERROR_VERSION_MISMATCH: return "Incompatible save version"
+		SaveResult.ERROR_MODULE_FAILED: return "Save module failed"
+		SaveResult.ERROR_LOAD_IN_PROGRESS: return "Cannot save while loading"
+		_: return "Unknown error"
+
 
 static func is_success(result: SaveResult) -> bool:
 	return result == SaveResult.SUCCESS
+
 
 static func is_error(result: SaveResult) -> bool:
 	return result != SaveResult.SUCCESS

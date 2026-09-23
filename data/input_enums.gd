@@ -1,41 +1,40 @@
 class_name InputEnums
-
-## Enums para sistema de input
+## Shared types for InputManager.
 
 enum InputDevice {
-	KEYBOARD = 0,
-	GAMEPAD = 1,
-	TOUCH = 2
+	KEYBOARD,
+	GAMEPAD,
+	TOUCH,
 }
 
 enum GamepadType {
-	UNKNOWN = 0,
-	XBOX = 1,
-	PLAYSTATION = 2,
-	NINTENDO = 3,
-	GENERIC = 4
+	UNKNOWN,
+	XBOX,
+	PLAYSTATION,
+	NINTENDO,
+	GENERIC,
 }
 
 enum InputContext {
-	GAMEPLAY = 0,
-	UI = 1,
-	MENU = 2,
-	DEFAULT = 3
+	GAMEPLAY,
+	UI,
+	MENU,
+	DEFAULT,
 }
 
-## MÉTODOS UTILITARIOS
 
 static func get_device_name(device: InputDevice) -> String:
 	match device:
-		InputDevice.KEYBOARD: return "Teclado/Mouse"
+		InputDevice.KEYBOARD: return "Keyboard/Mouse"
 		InputDevice.GAMEPAD: return "Gamepad"
-		InputDevice.TOUCH: return "Pantalla táctil"
-		_: return "Desconocido"
+		InputDevice.TOUCH: return "Touchscreen"
+		_: return "Unknown"
+
 
 static func get_gamepad_type_name(gamepad_type: GamepadType) -> String:
 	match gamepad_type:
 		GamepadType.XBOX: return "Xbox"
 		GamepadType.PLAYSTATION: return "PlayStation"
 		GamepadType.NINTENDO: return "Nintendo"
-		GamepadType.GENERIC: return "Genérico"
-		_: return "Desconocido"
+		InputEnums.GamepadType.GENERIC: return "Generic"
+		_: return "Unknown"
