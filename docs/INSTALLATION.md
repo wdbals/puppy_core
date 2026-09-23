@@ -28,8 +28,10 @@ required by the game:
 
 | Name | Script | Required dependencies |
 | --- | --- | --- |
-| `GameManager` | `res://puppy_core/autoloads/game_manager.gd` | None |
 | `AudioManager` | `res://puppy_core/autoloads/audio_manager.gd` | None |
+| `PauseManager` | `res://puppy_core/autoloads/pause_manager.gd` | None |
+| `SceneManager` | `res://puppy_core/autoloads/scene_manager.gd` | None |
+| `UISoundManager` | `res://puppy_core/autoloads/ui_sound_manager.gd` | `AudioManager` |
 | `InputManager` | `res://puppy_core/autoloads/input_manager.gd` | None |
 | `SaveManager` | `res://puppy_core/autoloads/save_manager.gd` | None |
 | `VideoManager` | `res://puppy_core/autoloads/video_manager.gd` | None |
@@ -40,6 +42,20 @@ singletons automatically.
 If project code connects two services, register that project coordinator after the
 services it references.
 
+Register `AudioManager` before `UISoundManager`. The UI service verifies this
+dependency at startup and reports a descriptive error instead of connecting any
+buttons when it is missing.
+
+Create a project-owned `UISoundProfile` resource and assign it before the main
+scene starts, typically from a project coordinator registered after both services:
+
+```gdscript
+const UI_SOUNDS := preload("res://game_content/config/ui_sounds.tres")
+
+func _ready() -> void:
+	UISoundManager.set_profile(UI_SOUNDS)
+```
+
 ## Configure the project
 
 Review `res://puppy_core/data/engine_config.gd`. It contains default audio buses,
@@ -48,9 +64,9 @@ pool size, fades, display resolutions, save behavior, and input settings.
 Define the actions used by the game in `Project Settings > Input Map`. The optional
 `InputManager` reads actions that exist when it starts.
 
-`AudioManager.setup_audio_buses()` creates missing `Master`, `SFX`, `Music`, and
-`Voice` buses. Projects with custom audio layouts can extend the defaults or use
-Godot's audio bus layout resource.
+`AudioManager.setup_audio_buses()` creates missing `Master`, `SFX`, `UI`, `Music`,
+and `Voice` buses. Projects with custom audio layouts can extend the defaults or
+use Godot's audio bus layout resource.
 
 ## Verify the installation
 

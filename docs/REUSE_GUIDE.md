@@ -31,11 +31,16 @@ extends Node
 var one_hit_mode := false
 
 func _ready() -> void:
-	GameManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
-	GameManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
+	PauseManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
+	PauseManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
 ```
 
 This keeps both reusable services independently installable.
+
+Application lifecycle belongs to the game coordinator as well. A `GameSession`
+autoload can intercept operating-system close requests, save project-specific data,
+and then exit. Puppy Core does not infer menu, gameplay, or cutscene states from
+scene filenames; games that need those states should model them explicitly.
 
 ## Public API
 
@@ -72,6 +77,12 @@ sound belongs to its entity as an `AudioStreamPlayer2D` or `AudioStreamPlayer3D`
 
 This distinction prevents the global manager from becoming responsible for entity
 lifetime and movement.
+
+`UISoundManager` is an optional adapter with one documented dependency:
+`AudioManager` must be registered first. It automatically connects `BaseButton`
+nodes and reads sounds from a `UISoundProfile` supplied by the consuming project.
+Use the `ui_sound_silent`, `ui_sound_confirm`, and `ui_sound_cancel` node groups to
+control individual buttons without attaching scripts.
 
 ## Combat payloads
 

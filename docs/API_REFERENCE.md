@@ -1,51 +1,69 @@
 # API Reference
 
-## GameManager
+## SceneManager
 
-`GameManager` handles application shutdown, SceneTree pause, scene changes, and a
-simple color transition. It does not track game states, difficulty, language, or
-playtime.
+`SceneManager` handles scene navigation and optional full-screen color transitions.
+The transition rendering is implemented by the reusable `ScreenTransition`
+component.
 
 ### Signals
 
 | Signal | Meaning |
 | --- | --- |
-| `game_paused` | The SceneTree was paused through the manager. |
-| `game_resumed` | The SceneTree was resumed through the manager. |
-| `game_ready` | The autoload completed `_ready()`. |
-| `quit_requested` | The application is about to quit. |
 | `scene_loaded(scene_path)` | A requested scene change succeeded. |
-| `transition_started(scene_path, duration)` | A scene or action transition started. |
+| `transition_started(scene_path, duration)` | A scene transition started. |
 | `screen_covered` | The viewport is fully covered. |
 | `transition_finished` | The transition completed. |
 
-### Scene and lifecycle methods
+### Scene methods
 
 ```gdscript
-GameManager.change_scene("res://scenes/menu.tscn")
-GameManager.change_scene_styled(
+var result := SceneManager.change_scene("res://scenes/menu.tscn")
+var styled_result := await SceneManager.change_scene_with_transition(
 	"res://scenes/level_01.tscn",
 	Color("080d1c"),
 	0.6
 )
-GameManager.execute_with_transition(setup_level)
-GameManager.request_quit()
 ```
 
-`execute_with_transition()` invokes its callable while the viewport is covered. It
-can temporarily pause the SceneTree during the operation.
+Both methods return Godot's built-in `Error` enum. Overlapping changes return
+`ERR_BUSY`.
+
+## PauseManager
+
+`PauseManager` owns only SceneTree pause coordination. It emits `game_paused` and
+`game_resumed` after changing the tree state.
 
 ### Pause methods
 
 ```gdscript
-GameManager.pause_game([pause_menu])
-GameManager.resume_game()
-GameManager.toggle_pause([pause_menu])
-var paused := GameManager.is_game_paused()
+PauseManager.pause([pause_menu])
+PauseManager.resume()
+PauseManager.toggle([pause_menu])
+var paused := PauseManager.is_paused()
 ```
 
 Nodes passed in `excluded_nodes` temporarily use `PROCESS_MODE_ALWAYS` and return
 to their previous processing mode on resume.
+
+## UISoundManager
+
+`UISoundManager` automatically connects every `BaseButton` added to the SceneTree.
+It requires an `AudioManager` autoload registered before it. The dependency is
+checked at runtime; without it, the service reports an error and remains inactive.
+
+Supply project-owned audio through a `UISoundProfile`:
+
+```gdscript
+const UI_SOUNDS := preload("res://game_content/config/ui_sounds.tres")
+
+func _ready() -> void:
+	UISoundManager.set_profile(UI_SOUNDS)
+```
+
+The optional groups `ui_sound_silent`, `ui_sound_confirm`, and `ui_sound_cancel`
+disable feedback or select role-specific sounds. `pressed` handles mouse, keyboard,
+and controller activation; optional hover and focus streams are supported as well.
 
 ## AudioManager
 
@@ -67,7 +85,7 @@ Use non-spatial playback for UI and sounds that should not be positioned in the
 world:
 
 ```gdscript
-AudioManager.play_sound(click_sound, AudioEnums.BusName.SFX)
+AudioManager.play_sound(click_sound, AudioEnums.BusName.UI)
 ```
 
 ### Positional effects
@@ -110,7 +128,7 @@ AudioManager.set_game_paused(true)
 ```
 
 `set_game_paused()` is an explicit integration point. A game coordinator may connect
-it to `GameManager`, but AudioManager never assumes that GameManager exists.
+it to `PauseManager`, but AudioManager never assumes that PauseManager exists.
 
 ## Combat
 
