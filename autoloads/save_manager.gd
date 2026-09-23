@@ -2,120 +2,172 @@ extends Node
 ## Optional singleton for reading and writing independent save modules.
 
 signal saving(slot: String)
-signal save_completed(slot: String, success: bool)
-
+signal save_completed(slot: String, result: Error)
 signal loading(slot: String)
-signal load_completed(slot: String, success: bool)
+signal load_completed(slot: String, result: Error)
 
-const _SECRET_KEY: String = "puppies-x7z-secure"
+const _SECRET_KEY := "puppies-x7z-secure"
 
-func write_module(slot_name: String, module: SaveModule) -> void:
+
+## Writes one module and returns the underlying Godot error code.
+func write_module(slot_name: String, module: SaveModule) -> Error:
 	saving.emit(slot_name)
-	var config = _load_config_file(slot_name)
+	var config := ConfigFile.new()
+	var result := _load_config_file(slot_name, config, true)
 
-	_write_module_data_to_config(config, module)
-	_save_config_to_disk(slot_name, config)
+	if result == OK:
+		result = _write_module_data_to_config(config, module)
+	if result == OK:
+		_update_metadata(config)
+		result = _save_config_to_disk(slot_name, config)
 
-func write_modules_batch(slot_name: String, modules: Array[SaveModule]) -> void:
+	save_completed.emit(slot_name, result)
+	return result
+
+
+## Writes multiple modules in one disk operation and returns the first error.
+func write_modules_batch(slot_name: String, modules: Array[SaveModule]) -> Error:
 	saving.emit(slot_name)
-	var config = _load_config_file(slot_name)
+	var config := ConfigFile.new()
+	var result := _load_config_file(slot_name, config, true)
 
-	for module in modules:
-		_write_module_data_to_config(config, module)
+	if result == OK:
+		for module in modules:
+			result = _write_module_data_to_config(config, module)
+			if result != OK:
+				break
 
-	_save_config_to_disk(slot_name, config)
+	if result == OK:
+		_update_metadata(config)
+		result = _save_config_to_disk(slot_name, config)
 
-# WRITE HELPERS
-func _write_module_data_to_config(config: ConfigFile, module: SaveModule) -> void:
+	save_completed.emit(slot_name, result)
+	return result
+
+
+## Reads and restores one module, preserving its specific error code.
+func read_module(slot_name: String, module: SaveModule) -> Error:
+	loading.emit(slot_name)
+	var config := ConfigFile.new()
+	var result := _load_config_file(slot_name, config, false)
+
+	if result == OK:
+		result = _read_module_data_from_config(config, module)
+
+	load_completed.emit(slot_name, result)
+	return result
+
+
+## Restores modules in order and returns the first error encountered.
+func read_modules_batch(slot_name: String, modules: Array[SaveModule]) -> Error:
+	loading.emit(slot_name)
+	var config := ConfigFile.new()
+	var result := _load_config_file(slot_name, config, false)
+
+	if result == OK:
+		for module in modules:
+			result = _read_module_data_from_config(config, module)
+			if result != OK:
+				break
+
+	load_completed.emit(slot_name, result)
+	return result
+
+
+func _write_module_data_to_config(config: ConfigFile, module: SaveModule) -> Error:
+	if not module:
+		return ERR_INVALID_PARAMETER
+
+	var section := module.get_module_name().strip_edges()
+	if section.is_empty():
+		return ERR_INVALID_DATA
+
 	module.pre_save()
-	var section = module.get_module_name()
-	var data = module.capture_snapshot()
-
+	var data := module.capture_snapshot()
+	config.erase_section(section)
 	for key in data:
 		config.set_value(section, key, data[key])
+	return OK
 
-	# Refresh the shared timestamp whenever any module is written.
-	config.set_value("meta", "last_updated", Time.get_unix_time_from_system())
 
-# READ
+func _read_module_data_from_config(config: ConfigFile, module: SaveModule) -> Error:
+	if not module:
+		return ERR_INVALID_PARAMETER
 
-## Reads one module from a slot.
-func read_module(slot_name: String, module: SaveModule) -> bool:
-	loading.emit(slot_name)
-	var config = _load_config_file(slot_name)
-
-	var success = _read_module_data_from_config(config, module)
-
-	load_completed.emit(slot_name, success)
-	return success
-
-## Reads multiple modules with one disk operation.
-func read_modules_batch(slot_name: String, modules: Array[SaveModule]) -> bool:
-	loading.emit(slot_name)
-	var config = _load_config_file(slot_name)
-
-	var all_success = true
-
-	for module in modules:
-		var single_success = _read_module_data_from_config(config, module)
-		if not single_success:
-			all_success = false
-
-	load_completed.emit(slot_name, all_success)
-	return all_success
-
-# READ HELPERS
-func _read_module_data_from_config(config: ConfigFile, module: SaveModule) -> bool:
-	var section = module.get_module_name()
-
+	var section := module.get_module_name().strip_edges()
+	if section.is_empty():
+		return ERR_INVALID_DATA
 	if not config.has_section(section):
-		return false
+		return ERR_DOES_NOT_EXIST
 
-	var data = {}
+	var data := {}
 	for key in config.get_section_keys(section):
 		data[key] = config.get_value(section, key)
 
-	if module.validate_data(data):
-		module.restore_snapshot(data)
-		module.post_load()
-		return true
+	if not module.validate_data(data):
+		return ERR_INVALID_DATA
 
-	return false
+	var result := module.restore_snapshot(data)
+	if result != OK:
+		return result
 
-# I/O
+	module.post_load()
+	return OK
 
-func _load_config_file(slot_name: String) -> ConfigFile:
-	var config = ConfigFile.new()
-	var path = _get_slot_path(slot_name)
 
-	var err = OK
+func _load_config_file(
+	slot_name: String,
+	config: ConfigFile,
+	allow_missing: bool
+) -> Error:
+	var validation_result := _validate_slot_name(slot_name)
+	if validation_result != OK:
+		return validation_result
+
+	var path := _get_slot_path(slot_name)
+	if not FileAccess.file_exists(path):
+		return OK if allow_missing else ERR_FILE_NOT_FOUND
+
 	if EngineConfig.SAVE_USE_ENCRYPTION:
-		if FileAccess.file_exists(path):
-			err = config.load_encrypted_pass(path, _SECRET_KEY)
-	else:
-		err = config.load(path)
+		return config.load_encrypted_pass(path, _SECRET_KEY)
+	return config.load(path)
 
-	# A missing or invalid file behaves like an empty slot.
-	if err != OK:
-		push_warning("Could not load save file: " + path)
 
-	return config
+func _save_config_to_disk(slot_name: String, config: ConfigFile) -> Error:
+	var validation_result := _validate_slot_name(slot_name)
+	if validation_result != OK:
+		return validation_result
 
-func _save_config_to_disk(slot_name: String, config: ConfigFile) -> void:
-	_ensure_save_dir()
-	var path = _get_slot_path(slot_name)
+	var directory_result := _ensure_save_dir()
+	if directory_result != OK:
+		return directory_result
 
-	var err = OK
+	var path := _get_slot_path(slot_name)
 	if EngineConfig.SAVE_USE_ENCRYPTION:
-		err = config.save_encrypted_pass(path, _SECRET_KEY)
-	else:
-		err = config.save(path)
+		return config.save_encrypted_pass(path, _SECRET_KEY)
+	return config.save(path)
 
-	save_completed.emit(slot_name, err == OK)
+
+func _validate_slot_name(slot_name: String) -> Error:
+	var normalized_name := slot_name.strip_edges()
+	if normalized_name.is_empty():
+		return ERR_INVALID_PARAMETER
+	if normalized_name.contains("/") or normalized_name.contains("\\"):
+		return ERR_INVALID_PARAMETER
+	if normalized_name == "." or normalized_name == "..":
+		return ERR_INVALID_PARAMETER
+	return OK
+
+
+func _update_metadata(config: ConfigFile) -> void:
+	config.set_value("meta", "last_updated", Time.get_unix_time_from_system())
+
 
 func _get_slot_path(slot_name: String) -> String:
-	return "user://saves/%s.cfg" % slot_name
+	return "user://saves/%s.cfg" % slot_name.strip_edges()
 
-func _ensure_save_dir() -> void:
-	if not DirAccess.dir_exists_absolute("user://saves"):
-		DirAccess.make_dir_absolute("user://saves")
+
+func _ensure_save_dir() -> Error:
+	if DirAccess.dir_exists_absolute("user://saves"):
+		return OK
+	return DirAccess.make_dir_recursive_absolute("user://saves")

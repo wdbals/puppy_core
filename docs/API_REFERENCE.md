@@ -173,10 +173,25 @@ screen size.
 ## SaveManager
 
 ```gdscript
-SaveManager.write_module("slot_1", player_save)
-SaveManager.write_modules_batch("slot_1", [player_save, world_save])
-SaveManager.read_module("slot_1", player_save)
-SaveManager.read_modules_batch("slot_1", [player_save, world_save])
+var save_result: Error = SaveManager.write_module("slot_1", player_save)
+if save_result != OK:
+	push_error("Save failed: %s" % error_string(save_result))
+
+var load_result: Error = SaveManager.read_modules_batch(
+	"slot_1",
+	[player_save, world_save]
+)
+if load_result != OK:
+	push_error("Load failed: %s" % error_string(load_result))
+```
+
+All write and read methods return Godot's built-in `Error` enum. Batch methods stop
+at the first failed module and return its error. Completion signals carry the same
+result:
+
+```gdscript
+signal save_completed(slot: String, result: Error)
+signal load_completed(slot: String, result: Error)
 ```
 
 See [Save Modules](SAVE_MODULES.md) for the `SaveModule` contract.

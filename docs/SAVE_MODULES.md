@@ -25,10 +25,12 @@ func capture_snapshot() -> Dictionary:
 		"health": player.health,
 	}
 
-func restore_snapshot(data: Dictionary) -> bool:
+func restore_snapshot(data: Dictionary) -> Error:
+	if not data.has("position") or not data.has("health"):
+		return ERR_INVALID_DATA
 	player.global_position = data.position
 	player.health = data.health
-	return true
+	return OK
 
 func validate_data(data: Dictionary) -> bool:
 	return data.has("position") and data.has("health")
@@ -40,8 +42,9 @@ files.
 ## Write data
 
 ```gdscript
-SaveManager.write_module("slot_1", player_save)
-SaveManager.write_modules_batch("slot_1", [player_save, world_save])
+var result := SaveManager.write_module("slot_1", player_save)
+if result != OK:
+	push_error("Save failed: %s" % error_string(result))
 ```
 
 The manager loads the existing slot, calls `pre_save()`, captures each snapshot,
@@ -53,15 +56,30 @@ logical game state.
 ## Read data
 
 ```gdscript
-var player_ok := SaveManager.read_module("slot_1", player_save)
-var all_ok := SaveManager.read_modules_batch(
+var result := SaveManager.read_modules_batch(
 	"slot_1",
 	[player_save, world_save]
 )
+if result != OK:
+	push_error("Load failed: %s" % error_string(result))
 ```
 
 For each module, the manager reads its section, calls `validate_data()`, restores the
-snapshot, and then calls `post_load()`.
+snapshot, and then calls `post_load()`. Missing files return `ERR_FILE_NOT_FOUND`,
+missing module sections return `ERR_DOES_NOT_EXIST`, invalid dictionaries return
+`ERR_INVALID_DATA`, and `restore_snapshot()` can return a more specific error.
+
+All public read and write methods use Godot's `Error` enum. Batch operations stop at
+the first failed module, so callers receive the original error instead of a generic
+success flag. The completion signals contain that same result:
+
+```gdscript
+SaveManager.save_completed.connect(
+	func(slot: String, result: Error) -> void:
+		if result != OK:
+			push_error("Could not save %s: %s" % [slot, error_string(result)])
+)
+```
 
 ## Versioning save schemas
 

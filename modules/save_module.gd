@@ -12,10 +12,10 @@ func capture_snapshot() -> Dictionary:
 	push_error("SaveModule.capture_snapshot() must be overridden")
 	return {}
 
-## Restores module data and reports whether it succeeded.
-func restore_snapshot(_data: Dictionary) -> bool:
+## Restores module data and returns a Godot Error code.
+func restore_snapshot(_data: Dictionary) -> Error:
 	push_error("SaveModule.restore_snapshot() must be overridden")
-	return false
+	return ERR_METHOD_NOT_FOUND
 
 # Hooks
 
