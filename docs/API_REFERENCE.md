@@ -70,6 +70,10 @@ and controller activation; optional hover and focus streams are supported as wel
 `AudioManager` handles music, pooled non-spatial effects, one-shot positional audio,
 and bus volume. It does not depend on any other autoload.
 
+The supplied `res://puppy_core/audio/default_bus_layout.tres` defines the standard
+bus topology for editor authoring. `setup_audio_buses()` is a runtime fallback: it
+creates missing buses without changing existing volumes or mute states.
+
 ### Music
 
 ```gdscript

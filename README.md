@@ -22,6 +22,8 @@ while the module boundaries settle.
 
 ```text
 puppy_core/
+  audio/
+    default_bus_layout.tres
   autoloads/
     audio_manager.gd
     debug_overlay.gd
@@ -43,6 +45,9 @@ puppy_core/
 
 `autoloads/` is flat because there is no second framework layer inside Puppy Core.
 Components and data types can be used without enabling any singleton.
+
+The standard audio layout provides `Master`, `SFX`, `UI`, `Music`, and `Voice`.
+Projects may reference it directly or select their own `AudioBusLayout`.
 
 ## Installation
 

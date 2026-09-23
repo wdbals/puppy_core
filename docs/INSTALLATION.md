@@ -58,6 +58,20 @@ func _ready() -> void:
 
 ## Configure the project
 
+Puppy Core includes a standard audio layout. Point the project setting
+`audio/buses/default_bus_layout` to it:
+
+```ini
+[audio]
+
+buses/default_bus_layout="res://puppy_core/audio/default_bus_layout.tres"
+```
+
+This makes `Master`, `SFX`, `UI`, `Music`, and `Voice` available in the editor.
+Games that need custom routing or effects can select a project-owned layout instead.
+The runtime setup only creates missing buses and never overwrites existing bus
+volume or mute state.
+
 Review `res://puppy_core/data/engine_config.gd`. It contains default audio buses,
 pool size, fades, display resolutions, save behavior, and input settings.
 

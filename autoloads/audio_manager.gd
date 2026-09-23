@@ -23,16 +23,24 @@ func _ready() -> void:
 	setup_audio_buses()
 
 
-## Creates any missing buses and applies Puppy Core defaults.
+## Creates missing buses as a runtime fallback. Existing project buses keep their
+## authored or user-configured volume and mute state.
 func setup_audio_buses() -> void:
 	for bus_name in EngineConfig.DEFAULT_AUDIO_BUSES:
 		var config: Dictionary = EngineConfig.DEFAULT_AUDIO_BUSES[bus_name]
 		var bus_index := AudioServer.get_bus_index(bus_name)
-		if bus_index == -1:
-			bus_index = AudioServer.get_bus_count()
-			AudioServer.add_bus(bus_index)
-			AudioServer.set_bus_name(bus_index, bus_name)
+		if bus_index != -1:
+			continue
 
+		if OS.is_debug_build():
+			push_warning(
+				"Missing audio bus '%s'. Add it to the project's AudioBusLayout." %
+				bus_name
+			)
+
+		bus_index = AudioServer.get_bus_count()
+		AudioServer.add_bus(bus_index)
+		AudioServer.set_bus_name(bus_index, bus_name)
 		AudioServer.set_bus_volume_db(bus_index, linear_to_db(config.volume))
 		AudioServer.set_bus_mute(bus_index, config.muted)
 
