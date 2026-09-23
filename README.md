@@ -9,7 +9,8 @@ while the module boundaries settle.
 
 ## Features
 
-- Independent audio, input, save, video, and lifecycle autoloads.
+- Independent audio, input, save, video, pause, and scene autoloads.
+- Optional automatic audio feedback for UI buttons.
 - Non-spatial, positional 2D, and positional 3D audio playback.
 - Scene transitions and pause control without game-specific state assumptions.
 - Reusable health, hitbox, hurtbox, movement, camera, and animation components.
@@ -24,9 +25,11 @@ puppy_core/
   autoloads/
     audio_manager.gd
     debug_overlay.gd
-    game_manager.gd
     input_manager.gd
+    pause_manager.gd
     save_manager.gd
+    scene_manager.gd
+    ui_sound_manager.gd
     video_manager.gd
   components/
     animation/
@@ -54,22 +57,25 @@ Register only the services needed by the project:
 
 | Autoload name | Path |
 | --- | --- |
-| `GameManager` | `res://puppy_core/autoloads/game_manager.gd` |
 | `AudioManager` | `res://puppy_core/autoloads/audio_manager.gd` |
+| `PauseManager` | `res://puppy_core/autoloads/pause_manager.gd` |
+| `SceneManager` | `res://puppy_core/autoloads/scene_manager.gd` |
+| `UISoundManager` | `res://puppy_core/autoloads/ui_sound_manager.gd` |
 | `InputManager` | `res://puppy_core/autoloads/input_manager.gd` |
 | `SaveManager` | `res://puppy_core/autoloads/save_manager.gd` |
 | `VideoManager` | `res://puppy_core/autoloads/video_manager.gd` |
 
-The services do not require each other. A game can connect them from its own
-coordinator when it wants integrated behavior:
+Most services do not require each other. `UISoundManager` is the deliberate
+exception: it requires `AudioManager` to be registered before it. A game can
+connect otherwise independent services from its own coordinator:
 
 ```gdscript
 # game_content/autoloads/game_session.gd
 extends Node
 
 func _ready() -> void:
-	GameManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
-	GameManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
+	PauseManager.game_paused.connect(AudioManager.set_game_paused.bind(true))
+	PauseManager.game_resumed.connect(AudioManager.set_game_paused.bind(false))
 ```
 
 See [Installation](docs/INSTALLATION.md) for the full setup.
@@ -77,7 +83,7 @@ See [Installation](docs/INSTALLATION.md) for the full setup.
 ## Quick examples
 
 ```gdscript
-GameManager.change_scene_styled("res://scenes/level_01.tscn")
+SceneManager.change_scene_with_transition("res://scenes/level_01.tscn")
 
 AudioManager.play_music(preload("res://audio/theme.ogg"), "theme")
 AudioManager.play_sound(preload("res://audio/click.wav"))

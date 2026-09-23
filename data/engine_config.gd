@@ -4,6 +4,7 @@ class_name EngineConfig
 const DEFAULT_AUDIO_BUSES := {
 	"Master": {"volume": 1.0, "muted": false},
 	"SFX": {"volume": 0.8, "muted": false},
+	"UI": {"volume": 0.8, "muted": false},
 	"Music": {"volume": 0.6, "muted": false},
 	"Voice": {"volume": 0.9, "muted": false},
 }

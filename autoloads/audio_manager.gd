@@ -296,12 +296,14 @@ func _get_bus_name_from_enum(bus: AudioEnums.BusName) -> String:
 		AudioEnums.BusName.SFX: return "SFX"
 		AudioEnums.BusName.MUSIC: return "Music"
 		AudioEnums.BusName.VOICE: return "Voice"
+		AudioEnums.BusName.UI: return "UI"
 		_: return "Master"
 
 
 func _get_sound_type_from_bus(bus: AudioEnums.BusName) -> AudioEnums.SoundType:
 	match bus:
 		AudioEnums.BusName.SFX: return AudioEnums.SoundType.GAMEPLAY
+		AudioEnums.BusName.UI: return AudioEnums.SoundType.UI
 		AudioEnums.BusName.VOICE: return AudioEnums.SoundType.VOICE
 		AudioEnums.BusName.MUSIC: return AudioEnums.SoundType.MUSIC
 		_: return AudioEnums.SoundType.UI

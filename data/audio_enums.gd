@@ -6,6 +6,7 @@ enum BusName {
 	SFX,
 	MUSIC,
 	VOICE,
+	UI,
 }
 
 enum SoundType {
