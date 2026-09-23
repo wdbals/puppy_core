@@ -1,29 +1,41 @@
-extends Resource
 class_name Health
+extends Resource
+## Reusable health resource with per-owner runtime state.
 
 signal died
 signal health_changed(health_left: float)
 
-@export var MAX_HEALTH := 100
+@export var max_health := 100.0
 
-var _current_health : float:
-	set(hp):
-		_current_health = hp
+var _current_health: float:
+	set(value):
+		_current_health = value
 		health_changed.emit(_current_health)
-		if _current_health <= 0:
+		if _current_health <= 0.0:
 			died.emit()
 
+
 func initialize() -> void:
-	_current_health = MAX_HEALTH
+	_current_health = max_health
 
-func increased_health(hp: float):
-	_current_health = clamp(_current_health + hp, 0, MAX_HEALTH)
 
-func take_damage(hp: float):
-	_current_health = clamp(_current_health - hp, 0, MAX_HEALTH)
+func increase_health(amount: float) -> void:
+	_current_health = clampf(_current_health + amount, 0.0, max_health)
+
+
+func take_damage(amount: float) -> void:
+	_current_health = clampf(_current_health - amount, 0.0, max_health)
+
+
+func get_current_health() -> float:
+	return _current_health
+
 
 func get_health_percentage() -> float:
-	return _current_health / MAX_HEALTH
+	if is_zero_approx(max_health):
+		return 0.0
+	return _current_health / max_health
+
 
 func is_dead() -> bool:
-	return _current_health <= 0
+	return _current_health <= 0.0

@@ -1,18 +1,21 @@
-extends Area2D
 class_name HurtBox
+extends Area2D
+## Receives HitData and forwards damage to a Health resource.
+
+signal damaged(hit: HitData)
 
 @export var health: Health
 
-signal damaged(damage_amount)
 
 func _ready() -> void:
 	if health:
 		health = health.duplicate()
 		health.initialize()
 
-func attack(dmg: float) -> bool:
-	if not health: 
+
+func receive_hit(hit: HitData) -> bool:
+	if not health or not hit:
 		return false
-	health.take_damage(dmg)
-	damaged.emit(dmg)
+	health.take_damage(hit.damage)
+	damaged.emit(hit)
 	return true
