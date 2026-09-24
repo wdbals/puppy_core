@@ -73,6 +73,11 @@ Audio bus topology and its authored mix belong to `AudioBusLayout`, rather than
 `PuppyAudioConfig`. The audio resource controls runtime behavior and missing-bus
 fallback values. Immutable package metadata lives in `PuppyCoreInfo`.
 
+`AudioSettingsModule` provides the reusable serialization mechanism for bus volume
+and mute preferences. The consuming project decides when to load or save it and
+which controls appear in its settings screen. This keeps menu flow and application
+lifecycle out of the shared module.
+
 ## Audio ownership
 
 Use `AudioManager.play_sound()` for UI and non-spatial sounds. Use

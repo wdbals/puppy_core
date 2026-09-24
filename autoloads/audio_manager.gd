@@ -215,11 +215,17 @@ func set_bus_volume(bus: AudioEnums.BusName, volume: float) -> void:
 	if bus_index == -1:
 		return
 	var clamped_volume := clampf(volume, 0.0, 1.0)
-	AudioServer.set_bus_volume_db(bus_index, linear_to_db(clamped_volume))
+	if bus == AudioEnums.BusName.MASTER and _pre_pause_volume >= 0.0:
+		_pre_pause_volume = clamped_volume
+		_set_bus_volume_raw(bus, config.paused_master_volume)
+	else:
+		AudioServer.set_bus_volume_db(bus_index, linear_to_db(clamped_volume))
 	bus_volume_changed.emit(bus, clamped_volume)
 
 
 func get_bus_volume(bus: AudioEnums.BusName) -> float:
+	if bus == AudioEnums.BusName.MASTER and _pre_pause_volume >= 0.0:
+		return _pre_pause_volume
 	var bus_index := AudioServer.get_bus_index(_get_bus_name_from_enum(bus))
 	if bus_index == -1:
 		return 0.0
@@ -234,7 +240,7 @@ func get_bus_state(bus: AudioEnums.BusName) -> Dictionary:
 		return {}
 	return {
 		"name": bus_name,
-		"volume": db_to_linear(AudioServer.get_bus_volume_db(bus_index)),
+		"volume": get_bus_volume(bus),
 		"muted": AudioServer.is_bus_mute(bus_index),
 	}
 
@@ -269,15 +275,17 @@ func toggle_bus_mute(bus: AudioEnums.BusName) -> bool:
 ## Optional integration point for a game-specific pause coordinator.
 func set_game_paused(paused: bool) -> void:
 	if paused:
-		_pre_pause_volume = get_bus_volume(AudioEnums.BusName.MASTER)
-		set_bus_volume(
+		if _pre_pause_volume < 0.0:
+			_pre_pause_volume = get_bus_volume(AudioEnums.BusName.MASTER)
+		_set_bus_volume_raw(
 			AudioEnums.BusName.MASTER,
 			config.paused_master_volume
 		)
 	else:
 		if _pre_pause_volume >= 0.0:
-			set_bus_volume(AudioEnums.BusName.MASTER, _pre_pause_volume)
-		_pre_pause_volume = -1.0
+			var restored_volume := _pre_pause_volume
+			_pre_pause_volume = -1.0
+			set_bus_volume(AudioEnums.BusName.MASTER, restored_volume)
 
 	for player in _sound_players:
 		if player.playing and player.bus in ["SFX", "Voice"]:
@@ -336,6 +344,15 @@ func _set_bus_mute(bus: AudioEnums.BusName, muted: bool) -> void:
 	var bus_index := AudioServer.get_bus_index(_get_bus_name_from_enum(bus))
 	if bus_index != -1:
 		AudioServer.set_bus_mute(bus_index, muted)
+
+
+func _set_bus_volume_raw(bus: AudioEnums.BusName, volume: float) -> void:
+	var bus_index := AudioServer.get_bus_index(_get_bus_name_from_enum(bus))
+	if bus_index != -1:
+		AudioServer.set_bus_volume_db(
+			bus_index,
+			linear_to_db(clampf(volume, 0.0, 1.0))
+		)
 
 
 func _get_bus_name_from_enum(bus: AudioEnums.BusName) -> String:

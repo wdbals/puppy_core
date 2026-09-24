@@ -16,7 +16,8 @@ while the module boundaries settle.
 - Reusable health, hitbox, hurtbox, movement, camera, and animation components.
 - A `HitData` payload that keeps damage, knockback, source, and hit position
   together.
-- Modular save data through the `SaveModule` base class.
+- Modular save data through the `SaveModule` base class, including a reusable
+  audio-preferences module.
 
 ## Structure
 
@@ -46,6 +47,8 @@ puppy_core/
     video_config.gd
   data/
   modules/
+    audio_settings_module.gd
+    save_module.gd
   docs/
   puppy_core_info.gd
 ```
@@ -105,6 +108,14 @@ AudioManager.play_music(preload("res://audio/theme.ogg"), "theme")
 AudioManager.play_sound(preload("res://audio/click.wav"))
 AudioManager.play_sound_2d(hit_sound, global_position)
 AudioManager.play_sound_3d(explosion_sound, global_position)
+```
+
+Persist bus volumes and mute states with the optional save services:
+
+```gdscript
+var audio_settings := AudioSettingsModule.new(AudioManager)
+SaveManager.read_module("preferences", audio_settings)
+SaveManager.write_module("preferences", audio_settings)
 ```
 
 Combat events carry one object instead of parallel arguments:

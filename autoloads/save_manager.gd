@@ -88,7 +88,8 @@ func _write_module_data_to_config(config: ConfigFile, module: SaveModule) -> Err
 
 	module.pre_save()
 	var data := module.capture_snapshot()
-	config.erase_section(section)
+	if config.has_section(section):
+		config.erase_section(section)
 	for key in data:
 		config.set_value(section, key, data[key])
 	return OK

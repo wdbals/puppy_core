@@ -42,6 +42,11 @@ singletons automatically.
 If project code connects two services, register that project coordinator after the
 services it references.
 
+For persisted audio preferences, register both `AudioManager` and `SaveManager`
+before the project coordinator. The coordinator can construct
+`AudioSettingsModule.new(AudioManager)`, load it at startup, and save it when the
+settings UI is accepted or the application exits.
+
 Register `AudioManager` before `UISoundManager`. The UI service verifies this
 dependency at startup and reports a descriptive error instead of connecting any
 buttons when it is missing.

@@ -143,6 +143,9 @@ range, and its mute state. `get_bus_states()` returns those snapshots keyed by
 
 `set_game_paused()` is an explicit integration point. A game coordinator may connect
 it to `PauseManager`, but AudioManager never assumes that PauseManager exists.
+While pause attenuation is active, the public bus state continues to report the
+user's selected Master volume. Changes made from a pause menu update that value and
+are applied when play resumes.
 
 ## Combat
 
@@ -232,5 +235,26 @@ signal load_completed(slot: String, result: Error)
 
 `PuppySaveConfig` controls the save directory, extension, and optional password
 encryption. Projects enabling encryption must provide their own non-empty password.
+
+### AudioSettingsModule
+
+`AudioSettingsModule` is a ready-made `SaveModule` for the volume and mute state of
+every bus exposed by `AudioEnums.BusName`. It depends on an `AudioManager` instance,
+which is supplied explicitly instead of being assumed by the module:
+
+```gdscript
+var audio_settings := AudioSettingsModule.new(AudioManager)
+
+var result := SaveManager.read_module("preferences", audio_settings)
+if result not in [OK, ERR_FILE_NOT_FOUND, ERR_DOES_NOT_EXIST]:
+	push_warning("Could not load audio preferences: %s" % error_string(result))
+
+result = SaveManager.write_module("preferences", audio_settings)
+```
+
+Saved data uses stable bus names rather than enum integers. Missing saved buses are
+ignored, so a newly added bus retains the project's authored default until the next
+save. The first missing preferences file is an expected first-run condition that
+the consuming project may treat as success.
 
 See [Save Modules](SAVE_MODULES.md) for the `SaveModule` contract.

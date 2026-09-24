@@ -81,6 +81,29 @@ SaveManager.save_completed.connect(
 )
 ```
 
+## Persist audio preferences
+
+Puppy Core includes `AudioSettingsModule` for the common volume and mute settings:
+
+```gdscript
+var audio_settings := AudioSettingsModule.new(AudioManager)
+
+func load_audio_settings() -> Error:
+	var result := SaveManager.read_module("preferences", audio_settings)
+	if result in [ERR_FILE_NOT_FOUND, ERR_DOES_NOT_EXIST]:
+		return OK
+	return result
+
+func save_audio_settings() -> Error:
+	return SaveManager.write_module("preferences", audio_settings)
+```
+
+Load it once after both autoloads are ready. Apply slider changes immediately so
+the player hears the result, then save when dragging ends or when the settings
+screen is accepted. This avoids a disk write for every intermediate slider value.
+The module stores an `audio` section in the selected slot and uses stable bus names
+for compatibility with reordered enums.
+
 ## Versioning save schemas
 
 `SaveModule.get_module_version()` returns a schema version for use by project code.
