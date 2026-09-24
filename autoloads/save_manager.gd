@@ -6,7 +6,7 @@ signal save_completed(slot: String, result: Error)
 signal loading(slot: String)
 signal load_completed(slot: String, result: Error)
 
-@export var config: PuppySaveConfig
+@export var config: PuppySaveConfig = PuppySaveConfig.new()
 
 
 func _ready() -> void:
@@ -15,6 +15,7 @@ func _ready() -> void:
 
 ## Writes one module and returns the underlying Godot error code.
 func write_module(slot_name: String, module: SaveModule) -> Error:
+	_ensure_config()
 	saving.emit(slot_name)
 	var config := ConfigFile.new()
 	var result := _load_config_file(slot_name, config, true)
@@ -31,6 +32,7 @@ func write_module(slot_name: String, module: SaveModule) -> Error:
 
 ## Writes multiple modules in one disk operation and returns the first error.
 func write_modules_batch(slot_name: String, modules: Array[SaveModule]) -> Error:
+	_ensure_config()
 	saving.emit(slot_name)
 	var config := ConfigFile.new()
 	var result := _load_config_file(slot_name, config, true)
@@ -51,6 +53,7 @@ func write_modules_batch(slot_name: String, modules: Array[SaveModule]) -> Error
 
 ## Reads and restores one module, preserving its specific error code.
 func read_module(slot_name: String, module: SaveModule) -> Error:
+	_ensure_config()
 	loading.emit(slot_name)
 	var config := ConfigFile.new()
 	var result := _load_config_file(slot_name, config, false)
@@ -64,6 +67,7 @@ func read_module(slot_name: String, module: SaveModule) -> Error:
 
 ## Restores modules in order and returns the first error encountered.
 func read_modules_batch(slot_name: String, modules: Array[SaveModule]) -> Error:
+	_ensure_config()
 	loading.emit(slot_name)
 	var config := ConfigFile.new()
 	var result := _load_config_file(slot_name, config, false)
@@ -175,6 +179,7 @@ func _update_metadata(config: ConfigFile) -> void:
 
 
 func _get_slot_path(slot_name: String) -> String:
+	_ensure_config()
 	var directory := config.save_directory.trim_suffix("/")
 	var extension := config.file_extension
 	if not extension.is_empty() and not extension.begins_with("."):
@@ -183,6 +188,7 @@ func _get_slot_path(slot_name: String) -> String:
 
 
 func _ensure_save_dir() -> Error:
+	_ensure_config()
 	if DirAccess.dir_exists_absolute(config.save_directory):
 		return OK
 	return DirAccess.make_dir_recursive_absolute(config.save_directory)
