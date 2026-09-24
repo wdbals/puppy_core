@@ -74,6 +74,10 @@ The supplied `res://puppy_core/audio/default_bus_layout.tres` defines the standa
 bus topology for editor authoring. `setup_audio_buses()` is a runtime fallback: it
 creates missing buses without changing existing volumes or mute states.
 
+Assign a `PuppyAudioConfig` resource to customize pool size, music fade duration,
+pause attenuation, spatial defaults, and missing-bus fallback values. Initial bus
+volumes for an authored project belong to its `AudioBusLayout`.
+
 ### Music
 
 ```gdscript
@@ -125,11 +129,17 @@ listener behavior is not sufficient.
 
 ```gdscript
 AudioManager.set_bus_volume(AudioEnums.BusName.MUSIC, 0.5)
+var music_state := AudioManager.get_bus_state(AudioEnums.BusName.MUSIC)
+var bus_states := AudioManager.get_bus_states()
 AudioManager.mute_bus(AudioEnums.BusName.SFX)
 AudioManager.unmute_bus(AudioEnums.BusName.SFX)
 AudioManager.toggle_bus_mute(AudioEnums.BusName.SFX)
 AudioManager.set_game_paused(true)
 ```
+
+`get_bus_state()` returns the bus name, its linear volume in the `0.0` to `1.0`
+range, and its mute state. `get_bus_states()` returns those snapshots keyed by
+`AudioEnums.BusName`, which is useful for populating settings screens.
 
 `set_game_paused()` is an explicit integration point. A game coordinator may connect
 it to `PauseManager`, but AudioManager never assumes that PauseManager exists.
@@ -180,6 +190,9 @@ InputManager.set_action_deadzone("aim_x", 0.25)
 InputManager.rebind_action("jump", new_event)
 ```
 
+Assign `PuppyInputConfig` to customize input buffer time, fallback deadzone, mouse
+sensitivity, and whether rebinding is allowed.
+
 ## VideoManager
 
 ```gdscript
@@ -189,8 +202,9 @@ VideoManager.toggle_fullscreen()
 VideoManager.set_vsync_mode(DisplayServer.VSYNC_ENABLED)
 ```
 
-Available resolutions come from `EngineConfig` and are filtered against the current
-screen size.
+Available resolutions and reset values come from `PuppyVideoConfig` and are filtered
+against the current screen size. Initial window state still comes from Godot project
+settings; `apply_config_defaults()` explicitly resets it to the resource values.
 
 ## SaveManager
 
@@ -215,5 +229,8 @@ result:
 signal save_completed(slot: String, result: Error)
 signal load_completed(slot: String, result: Error)
 ```
+
+`PuppySaveConfig` controls the save directory, extension, and optional password
+encryption. Projects enabling encryption must provide their own non-empty password.
 
 See [Save Modules](SAVE_MODULES.md) for the `SaveModule` contract.

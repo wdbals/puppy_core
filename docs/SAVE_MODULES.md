@@ -90,10 +90,10 @@ migrate older dictionaries before restoring them.
 
 ## Encryption
 
-`EngineConfig.SAVE_USE_ENCRYPTION` selects ConfigFile password encryption. The
-current password is an internal development default. Published games should inject
-their own key strategy instead of treating a source-code password as secure secret
-storage.
+`PuppySaveConfig.use_encryption` selects ConfigFile password encryption. The
+consuming project must supply a non-empty `encryption_password`; Puppy Core no longer
+ships a shared password. Treat a password embedded in project resources as
+obfuscation rather than secure secret storage.
 
 ## Guidelines
 

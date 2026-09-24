@@ -38,13 +38,24 @@ puppy_core/
     camera/
     combat/
     movement/
+  config/
+    audio_config.gd
+    input_config.gd
+    save_config.gd
+    ui_sound_profile.gd
+    video_config.gd
   data/
   modules/
   docs/
+  puppy_core_info.gd
 ```
 
 `autoloads/` is flat because there is no second framework layer inside Puppy Core.
 Components and data types can be used without enabling any singleton.
+
+Each configurable service has an optional typed Resource. A script autoload uses
+the built-in defaults; a project can register a small wrapper scene that assigns
+its own `.tres` resource before the service enters `_ready()`.
 
 The standard audio layout provides `Master`, `SFX`, `UI`, `Music`, and `Voice`.
 Projects may reference it directly or select their own `AudioBusLayout`.

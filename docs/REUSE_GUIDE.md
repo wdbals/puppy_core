@@ -64,10 +64,14 @@ language makes search results and API usage consistent across projects.
 
 ## Configuration
 
-`EngineConfig` currently provides library defaults. Avoid editing it for a single
-game unless the change is useful to all consumers. When projects need substantially
-different defaults, introduce a project-owned configuration resource and pass it to
-the relevant service from the game's bootstrap code.
+Configuration is split by service into `PuppyAudioConfig`, `PuppyInputConfig`,
+`PuppySaveConfig`, and `PuppyVideoConfig`. Their class defaults let each manager run
+as a direct script autoload. A consuming project that needs different values should
+create a `.tres` instance and assign it through a project-owned autoload scene.
+
+Audio bus topology and its authored mix belong to `AudioBusLayout`, rather than
+`PuppyAudioConfig`. The audio resource controls runtime behavior and missing-bus
+fallback values. Immutable package metadata lives in `PuppyCoreInfo`.
 
 ## Audio ownership
 

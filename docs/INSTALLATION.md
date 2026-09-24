@@ -72,8 +72,22 @@ Games that need custom routing or effects can select a project-owned layout inst
 The runtime setup only creates missing buses and never overwrites existing bus
 volume or mute state.
 
-Review `res://puppy_core/data/engine_config.gd`. It contains default audio buses,
-pool size, fades, display resolutions, save behavior, and input settings.
+Configurable services use typed Resources: `PuppyAudioConfig`, `PuppyInputConfig`,
+`PuppySaveConfig`, and `PuppyVideoConfig`. Direct script autoloads use their default
+instances. To customize a service before `_ready()`, create a project-owned autoload
+scene with the core manager script on its root and assign the corresponding `.tres`
+to the exported `config` property:
+
+```text
+game_content/
+  autoloads/audio_manager.tscn
+  config/audio_config.tres
+```
+
+Register that scene as `AudioManager` instead of registering the script directly.
+The project's resource can change pool size, fades, spatial defaults, or pause
+attenuation without modifying Puppy Core. Authored bus volume, routing, and effects
+remain in the selected `AudioBusLayout`.
 
 Define the actions used by the game in `Project Settings > Input Map`. The optional
 `InputManager` reads actions that exist when it starts.

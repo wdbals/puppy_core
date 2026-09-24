@@ -7,18 +7,21 @@ signal music_changed(music_name: String)
 signal music_stopped
 signal music_finished
 
+@export var config: PuppyAudioConfig
+
 var _current_music: AudioStreamPlayer
 var _sound_players: Array[AudioStreamPlayer] = []
 var _spatial_players: Array[Node] = []
 var _pre_pause_volume := -1.0
 
-var current_music_name: String = EngineConfig.AUDIO_DEFAULT_MUSIC_NAME:
+var current_music_name := "":
 	set(value):
 		current_music_name = value
 		music_changed.emit(value)
 
 
 func _ready() -> void:
+	_ensure_config()
 	create_sound_pool()
 	setup_audio_buses()
 
@@ -26,8 +29,8 @@ func _ready() -> void:
 ## Creates missing buses as a runtime fallback. Existing project buses keep their
 ## authored or user-configured volume and mute state.
 func setup_audio_buses() -> void:
-	for bus_name in EngineConfig.DEFAULT_AUDIO_BUSES:
-		var config: Dictionary = EngineConfig.DEFAULT_AUDIO_BUSES[bus_name]
+	_ensure_config()
+	for bus_name in config.fallback_bus_volumes:
 		var bus_index := AudioServer.get_bus_index(bus_name)
 		if bus_index != -1:
 			continue
@@ -41,13 +44,18 @@ func setup_audio_buses() -> void:
 		bus_index = AudioServer.get_bus_count()
 		AudioServer.add_bus(bus_index)
 		AudioServer.set_bus_name(bus_index, bus_name)
-		AudioServer.set_bus_volume_db(bus_index, linear_to_db(config.volume))
-		AudioServer.set_bus_mute(bus_index, config.muted)
+		var volume := float(config.fallback_bus_volumes[bus_name])
+		AudioServer.set_bus_volume_db(bus_index, linear_to_db(volume))
+		AudioServer.set_bus_mute(
+			bus_index,
+			StringName(bus_name) in config.fallback_muted_buses
+		)
 
 
 ## Creates the initial pool used by non-spatial sound effects.
 func create_sound_pool() -> void:
-	for _index in EngineConfig.AUDIO_SOUND_POOL_SIZE:
+	_ensure_config()
+	for _index in maxi(config.sound_pool_size - _sound_players.size(), 0):
 		_sound_players.append(_create_sound_player())
 
 
@@ -59,7 +67,7 @@ func play_music(
 	if not music_stream:
 		return
 	if fade_duration < 0.0:
-		fade_duration = EngineConfig.AUDIO_DEFAULT_MUSIC_FADE
+		fade_duration = config.music_fade_duration
 	if _current_music and _current_music.stream == music_stream and _current_music.playing:
 		return
 
@@ -76,7 +84,7 @@ func play_music(
 		add_child(_current_music)
 
 	_current_music.stream = music_stream
-	current_music_name = EngineConfig.AUDIO_DEFAULT_MUSIC_NAME if music_name.is_empty() else music_name
+	current_music_name = music_name
 	_current_music.play()
 	if fade_duration > 0.0:
 		await fade_in_music(fade_duration)
@@ -84,14 +92,14 @@ func play_music(
 
 func stop_music(fade_duration: float = -1.0) -> void:
 	if fade_duration < 0.0:
-		fade_duration = EngineConfig.AUDIO_DEFAULT_MUSIC_FADE
+		fade_duration = config.music_fade_duration
 	if not _current_music:
 		return
 
 	if fade_duration > 0.0:
 		await fade_out_music(fade_duration)
 	_current_music.stop()
-	current_music_name = EngineConfig.AUDIO_MUSIC_STATUS_SILENCE
+	current_music_name = ""
 	music_stopped.emit()
 
 
@@ -132,16 +140,18 @@ func play_sound_2d(
 	sound_stream: AudioStream,
 	position: Vector2,
 	bus: AudioEnums.BusName = AudioEnums.BusName.SFX,
-	max_distance: float = EngineConfig.AUDIO_DEFAULT_2D_MAX_DISTANCE,
-	attenuation: float = EngineConfig.AUDIO_DEFAULT_2D_ATTENUATION
+	max_distance: float = -1.0,
+	attenuation: float = -1.0
 ) -> AudioStreamPlayer2D:
 	if not sound_stream:
 		return null
 	var player := AudioStreamPlayer2D.new()
 	player.stream = sound_stream
 	player.bus = _get_bus_name_from_enum(bus)
-	player.max_distance = max_distance
-	player.attenuation = attenuation
+	player.max_distance = config.default_2d_max_distance \
+		if max_distance < 0.0 else max_distance
+	player.attenuation = config.default_2d_attenuation \
+		if attenuation < 0.0 else attenuation
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(player)
 	player.global_position = position
@@ -156,16 +166,18 @@ func play_sound_3d(
 	sound_stream: AudioStream,
 	position: Vector3,
 	bus: AudioEnums.BusName = AudioEnums.BusName.SFX,
-	max_distance: float = EngineConfig.AUDIO_DEFAULT_3D_MAX_DISTANCE,
-	unit_size: float = EngineConfig.AUDIO_DEFAULT_3D_UNIT_SIZE
+	max_distance: float = -1.0,
+	unit_size: float = -1.0
 ) -> AudioStreamPlayer3D:
 	if not sound_stream:
 		return null
 	var player := AudioStreamPlayer3D.new()
 	player.stream = sound_stream
 	player.bus = _get_bus_name_from_enum(bus)
-	player.max_distance = max_distance
-	player.unit_size = unit_size
+	player.max_distance = config.default_3d_max_distance \
+		if max_distance < 0.0 else max_distance
+	player.unit_size = config.default_3d_unit_size \
+		if unit_size < 0.0 else unit_size
 	player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(player)
 	player.global_position = position
@@ -195,7 +207,7 @@ func stop_all_sounds() -> void:
 	_spatial_players.clear()
 	if _current_music:
 		_current_music.stop()
-		current_music_name = EngineConfig.AUDIO_MUSIC_STATUS_SILENCE
+		current_music_name = ""
 
 
 func set_bus_volume(bus: AudioEnums.BusName, volume: float) -> void:
@@ -212,6 +224,29 @@ func get_bus_volume(bus: AudioEnums.BusName) -> float:
 	if bus_index == -1:
 		return 0.0
 	return db_to_linear(AudioServer.get_bus_volume_db(bus_index))
+
+
+## Returns the current public state of one audio bus.
+func get_bus_state(bus: AudioEnums.BusName) -> Dictionary:
+	var bus_name := _get_bus_name_from_enum(bus)
+	var bus_index := AudioServer.get_bus_index(bus_name)
+	if bus_index == -1:
+		return {}
+	return {
+		"name": bus_name,
+		"volume": db_to_linear(AudioServer.get_bus_volume_db(bus_index)),
+		"muted": AudioServer.is_bus_mute(bus_index),
+	}
+
+
+## Returns the current public state of every bus managed by AudioManager.
+func get_bus_states() -> Dictionary:
+	var bus_states := {}
+	for bus in AudioEnums.BusName.values():
+		var bus_state := get_bus_state(bus)
+		if not bus_state.is_empty():
+			bus_states[bus] = bus_state
+	return bus_states
 
 
 func mute_bus(bus: AudioEnums.BusName) -> void:
@@ -237,7 +272,7 @@ func set_game_paused(paused: bool) -> void:
 		_pre_pause_volume = get_bus_volume(AudioEnums.BusName.MASTER)
 		set_bus_volume(
 			AudioEnums.BusName.MASTER,
-			EngineConfig.AUDIO_DEFAULT_ATTENUATION_PAUSE_SOUND
+			config.paused_master_volume
 		)
 	else:
 		if _pre_pause_volume >= 0.0:
@@ -284,8 +319,13 @@ func _on_spatial_player_finished(player: Node) -> void:
 
 
 func _on_music_finished() -> void:
-	current_music_name = EngineConfig.AUDIO_MUSIC_STATUS_SILENCE
+	current_music_name = ""
 	music_finished.emit()
+
+
+func _ensure_config() -> void:
+	if not config:
+		config = PuppyAudioConfig.new()
 
 
 func _emit_sound_played(stream: AudioStream, bus: AudioEnums.BusName) -> void:

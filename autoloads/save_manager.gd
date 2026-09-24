@@ -6,7 +6,11 @@ signal save_completed(slot: String, result: Error)
 signal loading(slot: String)
 signal load_completed(slot: String, result: Error)
 
-const _SECRET_KEY := "puppies-x7z-secure"
+@export var config: PuppySaveConfig
+
+
+func _ready() -> void:
+	_ensure_config()
 
 
 ## Writes one module and returns the underlying Godot error code.
@@ -128,8 +132,11 @@ func _load_config_file(
 	if not FileAccess.file_exists(path):
 		return OK if allow_missing else ERR_FILE_NOT_FOUND
 
-	if EngineConfig.SAVE_USE_ENCRYPTION:
-		return config.load_encrypted_pass(path, _SECRET_KEY)
+	if self.config.use_encryption:
+		if self.config.encryption_password.is_empty():
+			push_error("Save encryption requires a project-specific password.")
+			return ERR_INVALID_PARAMETER
+		return config.load_encrypted_pass(path, self.config.encryption_password)
 	return config.load(path)
 
 
@@ -143,8 +150,11 @@ func _save_config_to_disk(slot_name: String, config: ConfigFile) -> Error:
 		return directory_result
 
 	var path := _get_slot_path(slot_name)
-	if EngineConfig.SAVE_USE_ENCRYPTION:
-		return config.save_encrypted_pass(path, _SECRET_KEY)
+	if self.config.use_encryption:
+		if self.config.encryption_password.is_empty():
+			push_error("Save encryption requires a project-specific password.")
+			return ERR_INVALID_PARAMETER
+		return config.save_encrypted_pass(path, self.config.encryption_password)
 	return config.save(path)
 
 
@@ -164,10 +174,19 @@ func _update_metadata(config: ConfigFile) -> void:
 
 
 func _get_slot_path(slot_name: String) -> String:
-	return "user://saves/%s.cfg" % slot_name.strip_edges()
+	var directory := config.save_directory.trim_suffix("/")
+	var extension := config.file_extension
+	if not extension.is_empty() and not extension.begins_with("."):
+		extension = "." + extension
+	return "%s/%s%s" % [directory, slot_name.strip_edges(), extension]
 
 
 func _ensure_save_dir() -> Error:
-	if DirAccess.dir_exists_absolute("user://saves"):
+	if DirAccess.dir_exists_absolute(config.save_directory):
 		return OK
-	return DirAccess.make_dir_recursive_absolute("user://saves")
+	return DirAccess.make_dir_recursive_absolute(config.save_directory)
+
+
+func _ensure_config() -> void:
+	if not config:
+		config = PuppySaveConfig.new()

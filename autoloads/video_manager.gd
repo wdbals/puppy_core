@@ -1,12 +1,14 @@
 extends Node
 ## Optional singleton for window, resolution, and VSync settings.
 ##
-## Available resolutions and initial values come from EngineConfig.
+## Available resolutions and reset values come from PuppyVideoConfig.
 
 signal resolution_changed(new_resolution: Vector2i)
 signal display_mode_changed(new_mode: DisplayServer.WindowMode)
 signal vsync_mode_changed(new_mode: DisplayServer.VSyncMode)
 signal fullscreen_toggled(is_fullscreen: bool)
+
+@export var config: PuppyVideoConfig
 
 var _current_resolution: Vector2i:
 	set(value):
@@ -22,6 +24,7 @@ var _current_vsync_mode: DisplayServer.VSyncMode:
 		vsync_mode_changed.emit(value)
 
 func _ready() -> void:
+	_ensure_config()
 	self.resolution_changed.connect(_on_resolution_change)
 
 	_initialize_display_settings()
@@ -90,7 +93,7 @@ func get_current_resolution() -> Vector2i:
 ## Returns resolutions supported by the current display.
 func get_available_resolutions() -> Array[Vector2i]:
 	var screen_size = DisplayServer.screen_get_size()
-	var resolutions = EngineConfig.VIDEO_AVAILABLE_RESOLUTIONS.duplicate()
+	var resolutions = config.available_resolutions.duplicate()
 
 	resolutions = resolutions.filter(
 		func(res): return res.x <= screen_size.x and res.y <= screen_size.y
@@ -222,13 +225,18 @@ func _get_vsync_mode_name(mode: DisplayServer.VSyncMode) -> String:
 		DisplayServer.VSYNC_MAILBOX: return "Mailbox"
 		_: return "Unknown"
 
-## Applies Puppy Core display defaults.
-func apply_engine_defaults() -> void:
-	set_resolution(EngineConfig.VIDEO_DEFAULT_WINDOW_SIZE)
-	set_display_mode(EngineConfig.VIDEO_DEFAULT_WINDOW_MODE)
-	set_vsync_mode(EngineConfig.VIDEO_DEFAULT_VSYNC)
+## Applies the configured display defaults.
+func apply_config_defaults() -> void:
+	set_resolution(config.default_window_size)
+	set_display_mode(config.default_window_mode)
+	set_vsync_mode(config.default_vsync_mode)
 
 ## Refreshes the viewport and window position after a resolution change.
 func _on_resolution_change(resolution: Vector2i) -> void:
 	_force_viewport_redraw(resolution)
 	center_window()
+
+
+func _ensure_config() -> void:
+	if not config:
+		config = PuppyVideoConfig.new()

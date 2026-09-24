@@ -8,13 +8,17 @@ signal control_rebound(action: String, old_event: InputEvent, new_event: InputEv
 signal input_buffer_triggered(action: String)
 signal action_deadzone_changed(action: String, deadzone: float)
 
+@export var config: PuppyInputConfig
+
 var _current_device: InputEnums.InputDevice = InputEnums.InputDevice.KEYBOARD
 var _input_buffer: Dictionary = {}
 var _action_states: Dictionary = {}
 var _action_deadzones: Dictionary = {}
-var _mouse_sensitivity: float = EngineConfig.INPUT_DEFAULT_MOUSE_SENSITIVITY
+var _mouse_sensitivity := 1.0
 
 func _ready() -> void:
+	_ensure_config()
+	_mouse_sensitivity = config.default_mouse_sensitivity
 	_initialize_action_states()
 	_initialize_action_deadzones()
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
@@ -62,7 +66,7 @@ func set_action_deadzone(action: String, deadzone: float) -> void:
 
 ## Returns the current deadzone for an action.
 func get_action_deadzone(action: String) -> float:
-	return _action_deadzones.get(action, EngineConfig.INPUT_DEFAULT_GAMEPAD_DEADZONE)
+	return _action_deadzones.get(action, config.default_gamepad_deadzone)
 
 ## Sets the same deadzone for multiple actions.
 func set_actions_deadzone(actions: Array[String], deadzone: float) -> void:
@@ -74,7 +78,7 @@ func set_actions_deadzone(actions: Array[String], deadzone: float) -> void:
 func apply_default_deadzone_to_all_actions() -> void:
 	var actions = InputMap.get_actions()
 	for action in actions:
-		set_action_deadzone(action, EngineConfig.INPUT_DEFAULT_GAMEPAD_DEADZONE)
+		set_action_deadzone(action, config.default_gamepad_deadzone)
 
 ## Returns actions that contain gamepad axis events.
 func get_axis_actions() -> Array[String]:
@@ -180,7 +184,7 @@ func _process_input_buffer() -> void:
 	var expired_actions = []
 
 	for action in _input_buffer:
-		if current_time - _input_buffer[action] <= EngineConfig.INPUT_BUFFER_TIME * 1000:
+		if current_time - _input_buffer[action] <= config.input_buffer_time * 1000:
 			input_buffer_triggered.emit(action)
 		else:
 			expired_actions.append(action)
@@ -211,8 +215,8 @@ func get_action_events(action: String) -> Array[InputEvent]:
 
 ## Replaces an action's primary event.
 func rebind_action(action: String, new_event: InputEvent) -> bool:
-	if not EngineConfig.INPUT_ALLOW_INPUT_REBINDING:
-		push_warning("Input rebinding is disabled in EngineConfig")
+	if not config.allow_input_rebinding:
+		push_warning("Input rebinding is disabled in PuppyInputConfig")
 		return false
 
 	var old_events = get_action_events(action)
@@ -269,10 +273,10 @@ func _get_event_description(event: InputEvent) -> String:
 	else:
 		return "Unknown event"
 
-## Applies Puppy Core input defaults.
-func apply_engine_defaults() -> void:
+## Applies the configured input defaults.
+func apply_config_defaults() -> void:
 	apply_default_deadzone_to_all_actions()
-	set_mouse_sensitivity(EngineConfig.INPUT_DEFAULT_MOUSE_SENSITIVITY)
+	set_mouse_sensitivity(config.default_mouse_sensitivity)
 
 ## Returns a summary of the current input configuration.
 func get_config_summary() -> Dictionary:
@@ -282,3 +286,8 @@ func get_config_summary() -> Dictionary:
 		"axis_actions_count": get_axis_actions().size(),
 		"total_actions": InputMap.get_actions().size()
 	}
+
+
+func _ensure_config() -> void:
+	if not config:
+		config = PuppyInputConfig.new()
