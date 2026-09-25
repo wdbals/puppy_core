@@ -1,0 +1,9 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://puppy_core/components/combat/hurt_box_3d.gd" id="1"]
+
+[node name="HurtBox3D" type="Area3D"]
+collision_layer = 2
+collision_mask = 2
+monitoring = false
+script = ExtResource("1")
