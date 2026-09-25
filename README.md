@@ -14,8 +14,8 @@ while the module boundaries settle.
 - Non-spatial, positional 2D, and positional 3D audio playback.
 - Scene transitions and pause control without game-specific state assumptions.
 - Reusable health, hitbox, hurtbox, movement, camera, and animation components.
-- A `HitData` payload that keeps damage, knockback, source, and hit position
-  together.
+- `HitData` and `HitData3D` payloads that keep damage, knockback, source, and hit
+  position together.
 - Modular save data through the `SaveModule` base class, including a reusable
   audio-preferences module.
 
@@ -37,7 +37,7 @@ puppy_core/
   components/
     animation/
     camera/
-    combat/
+    combat/       # 2D and 3D hitboxes and hurtboxes
     movement/
   config/
     audio_config.gd

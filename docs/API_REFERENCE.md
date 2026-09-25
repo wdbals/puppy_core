@@ -180,6 +180,22 @@ func _on_hit_delivered(target: HurtBox, hit: HitData) -> void:
 	print(target, " received ", hit.damage)
 ```
 
+`Hitbox3D` and `HurtBox3D` provide the same contact and manual-hit behavior with
+`Area3D` nodes. Their `HitData3D` payload uses `Vector3` knockback and position
+values, and a `Node3D` source:
+
+```gdscript
+func _on_damaged(hit: HitData3D) -> void:
+	velocity += hit.knockback
+
+func _on_hit_delivered(target: HurtBox3D, hit: HitData3D) -> void:
+	print(target, " received ", hit.damage)
+```
+
+For `FACING_DIRECTION`, `Hitbox3D` uses the node's local forward direction
+(`-Z`). Configure each hitbox's collision mask to detect the opposing hurtbox
+layer, as with the 2D components.
+
 ## InputManager
 
 The input manager provides device detection, per-action deadzones, buffered input,

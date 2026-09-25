@@ -48,8 +48,8 @@ Treat these as public contracts:
 
 - Autoload names selected by the consuming project.
 - Signals and public methods documented in `API_REFERENCE.md`.
-- `class_name` types such as `HitData`, `Hitbox`, `HurtBox`, `Health`, and
-  `SaveModule`.
+- `class_name` types such as `HitData`, `HitData3D`, `Hitbox`, `Hitbox3D`,
+  `HurtBox`, `HurtBox3D`, `Health`, and `SaveModule`.
 - Exported properties stored in `.tscn` and `.tres` resources.
 
 Renaming an exported property requires updating existing scenes. Changing a signal's
